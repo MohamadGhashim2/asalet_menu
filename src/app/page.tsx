@@ -33,11 +33,7 @@ export default async function HomePage() {
   }) || []
 
   return (
-    <main className="min-h-screen pb-20 max-w-md mx-auto bg-gray-50 shadow-xl relative">
-      {/* Header */}
-      <header className="bg-white px-4 py-6 text-center shadow-sm sticky top-0 z-10">
-        <h1 className="text-2xl font-bold text-gray-900">المنيو</h1>
-      </header>
+    <main className="min-h-screen">
 
       <MenuClient 
         settings={settings || undefined}
