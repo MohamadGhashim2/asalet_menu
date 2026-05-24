@@ -40,7 +40,7 @@ export default function ImportPage() {
       <button
         onClick={handleImport}
         disabled={loading}
-        className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+        className="bg-brand-burgundy text-white px-6 py-2 rounded-md hover:bg-brand-burgundy-dark disabled:opacity-50"
       >
         {loading ? 'جاري الاستيراد...' : 'استيراد المنيو الأولي'}
       </button>

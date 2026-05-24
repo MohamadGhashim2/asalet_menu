@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/supabase'
 import { useRouter } from 'next/navigation'
 import { Trash2, Plus } from 'lucide-react'
+import ImageUploader from '../../../components/ImageUploader'
 
 type Category = Database['public']['Tables']['categories']['Row']
 type MenuItem = Database['public']['Tables']['menu_items']['Row']
@@ -166,9 +167,12 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
             <label className="block text-sm font-medium text-gray-700 mb-1">السعر الأساسي (اتركه فارغاً إذا كان يعتمد على الخيارات)</label>
             <input type="number" step="0.01" className="w-full px-3 py-2 border rounded-md" value={basePriceInput} onChange={e => setBasePriceInput(e.target.value)} />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">رابط الصورة</label>
-            <input type="text" className="w-full px-3 py-2 border rounded-md" placeholder="/menu-assets/..." value={item.image_url || ''} onChange={e => setItem({ ...item, image_url: e.target.value })} />
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">صورة المنتج</label>
+            <ImageUploader 
+              value={item.image_url || null} 
+              onChange={(url) => setItem({ ...item, image_url: url })} 
+            />
           </div>
           <div className="flex items-center gap-4 mt-4">
             <label className="flex items-center gap-2">
@@ -182,7 +186,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
           </div>
         </div>
         
-        <button type="submit" disabled={saving} className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
+        <button type="submit" disabled={saving} className="bg-brand-burgundy text-white px-6 py-2 rounded-md hover:bg-brand-burgundy-dark disabled:opacity-50">
           {saving ? 'جاري الحفظ...' : 'حفظ المنتج'}
         </button>
       </form>
@@ -234,7 +238,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                       <button onClick={() => deleteOption(group.id, opt.id)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   ))}
-                  <button onClick={() => addOption(group.id)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 mt-2">
+                  <button onClick={() => addOption(group.id)} className="text-sm text-brand-burgundy hover:text-brand-burgundy-dark flex items-center gap-1 mt-2">
                     <Plus className="w-3 h-3" /> إضافة خيار
                   </button>
                 </div>

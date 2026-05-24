@@ -85,7 +85,7 @@ export default function SettingsPage() {
           <input
             type="text"
             dir="ltr"
-            className="w-full px-4 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-2 border rounded-md focus:ring-brand-burgundy/100 focus:border-brand-burgundy/100"
             value={settings?.whatsapp || ''}
             onChange={(e) => setSettings({ ...settings!, whatsapp: e.target.value })}
             placeholder="+966500000000"
@@ -98,7 +98,7 @@ export default function SettingsPage() {
           </label>
           <input
             type="text"
-            className="w-full px-4 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-2 border rounded-md focus:ring-brand-burgundy/100 focus:border-brand-burgundy/100"
             value={settings?.currency || ''}
             onChange={(e) => setSettings({ ...settings!, currency: e.target.value })}
           />
@@ -111,7 +111,7 @@ export default function SettingsPage() {
           <input
             type="number"
             step="0.01"
-            className="w-full px-4 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-2 border rounded-md focus:ring-brand-burgundy/100 focus:border-brand-burgundy/100"
             value={settings?.tax_rate || 0}
             onChange={(e) => setSettings({ ...settings!, tax_rate: parseFloat(e.target.value) })}
           />
@@ -120,7 +120,7 @@ export default function SettingsPage() {
         <button
           type="submit"
           disabled={saving}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="w-full bg-brand-burgundy text-white py-2 px-4 rounded-md hover:bg-brand-burgundy-dark disabled:opacity-50"
         >
           {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
         </button>

@@ -45,7 +45,7 @@ export default function QrPage() {
           const ctx = canvas.getContext('new') // Wait, standard way to download QR code needs a canvas, but for MVP let's just ask them to right click or print
           window.print()
         }}
-        className="mt-6 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+        className="mt-6 bg-brand-burgundy text-white px-6 py-2 rounded-lg hover:bg-brand-burgundy-dark"
       >
         طباعة الصفحة
       </button>

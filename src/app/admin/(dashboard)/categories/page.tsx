@@ -92,7 +92,7 @@ export default function CategoriesPage() {
         <h1 className="text-2xl font-bold text-gray-900">الأقسام</h1>
         <button
           onClick={() => setIsAdding(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          className="bg-brand-burgundy text-white px-4 py-2 rounded-lg hover:bg-brand-burgundy-dark flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
           إضافة قسم
@@ -150,7 +150,7 @@ export default function CategoriesPage() {
                     </div>
                   ) : (
                     <div className="flex gap-4">
-                      <button onClick={() => startEdit(category)} className="text-blue-600 hover:text-blue-900"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => startEdit(category)} className="text-brand-burgundy hover:text-brand-burgundy-dark"><Edit2 className="w-4 h-4" /></button>
                       <button onClick={() => handleDelete(category.id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   )}

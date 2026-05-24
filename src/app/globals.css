@@ -2,11 +2,20 @@
 
 @theme inline {
   --font-sans: var(--font-cairo), sans-serif;
+  --color-brand-burgundy: #7A1524;
+  --color-brand-burgundy-dark: #5E0F1B;
+  --color-brand-gold: #C58A1C;
+  --color-brand-gold-soft: #D9A441;
+  --color-brand-cream: #F7F1E8;
+  --color-brand-beige: #EFE3D1;
+  --color-brand-text: #2A211B;
+  --color-brand-brown: #6B4E3D;
+  --color-brand-border: #E5D5BF;
 }
 
 body {
   font-family: var(--font-cairo), sans-serif;
-  @apply bg-gray-50 text-gray-900;
+  @apply bg-brand-cream text-brand-text;
 }
 
 .hide-scrollbar::-webkit-scrollbar {

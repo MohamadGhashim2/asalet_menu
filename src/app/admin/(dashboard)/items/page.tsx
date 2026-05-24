@@ -51,7 +51,7 @@ export default function ItemsPage() {
         <h1 className="text-2xl font-bold text-gray-900">المنتجات</h1>
         <Link
           href="/admin/items/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          className="bg-brand-burgundy text-white px-4 py-2 rounded-lg hover:bg-brand-burgundy-dark flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
           إضافة منتج
@@ -88,7 +88,7 @@ export default function ItemsPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex gap-4">
-                    <Link href={`/admin/items/${item.id}`} className="text-blue-600 hover:text-blue-900">
+                    <Link href={`/admin/items/${item.id}`} className="text-brand-burgundy hover:text-brand-burgundy-dark">
                       <Edit2 className="w-4 h-4" />
                     </Link>
                     <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:text-red-900">
