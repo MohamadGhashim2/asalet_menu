@@ -11,6 +11,14 @@ type Option = Database['public']['Tables']['item_options']['Row']
 type OptionGroup = Database['public']['Tables']['item_option_groups']['Row'] & { options: Option[] }
 type MenuItem = Database['public']['Tables']['menu_items']['Row'] & { groups: OptionGroup[] }
 
+type CartItem = {
+  id: string
+  item: MenuItem
+  selections: Record<string, string[]>
+  quantity: number
+  total: number
+}
+
 export default function MenuClient({
   settings,
   categories,
@@ -23,6 +31,9 @@ export default function MenuClient({
   const [activeCategoryView, setActiveCategoryView] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [selections, setSelections] = useState<Record<string, string[]>>({})
+  
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [isCartOpen, setIsCartOpen] = useState(false)
 
   const currency = settings?.currency || 'ر.س'
 
@@ -93,6 +104,48 @@ export default function MenuClient({
 
   const total = calculateTotal()
 
+  const addToCart = () => {
+    if (!selectedItem || total === null) return
+    
+    setCart(prev => [...prev, {
+      id: Math.random().toString(36).substring(7),
+      item: selectedItem,
+      selections,
+      quantity: 1,
+      total
+    }])
+    setSelectedItem(null)
+  }
+
+  const removeFromCart = (cartItemId: string) => {
+    setCart(prev => prev.filter(c => c.id !== cartItemId))
+  }
+
+  const cartTotal = cart.reduce((sum, current) => sum + current.total * current.quantity, 0)
+
+  const generateWhatsAppMessage = () => {
+    let msg = `*طلب جديد من القائمة* 🛒\n\n`
+    
+    cart.forEach(cartItem => {
+      msg += `▪️ *${cartItem.item.name}* (x${cartItem.quantity})\n`
+      
+      // Add selections
+      cartItem.item.groups.forEach(group => {
+        const selectedOptionIds = cartItem.selections[group.id] || []
+        const selectedOptions = group.options.filter(o => selectedOptionIds.includes(o.id))
+        if (selectedOptions.length > 0) {
+          msg += `   - ${group.title}: ${selectedOptions.map(o => o.name).join('، ')}\n`
+        }
+      })
+      msg += `   السعر: ${cartItem.total} ${currency}\n\n`
+    })
+
+    msg += `-------------------\n`
+    msg += `*الإجمالي:* ${cartTotal} ${currency}`
+
+    return encodeURIComponent(msg)
+  }
+
   return (
     <div className="pb-24 min-h-screen bg-brand-cream">
       
@@ -137,7 +190,19 @@ export default function MenuClient({
                   onClick={() => openCategory(cat.id)}
                   className="group relative aspect-square rounded-2xl overflow-hidden shadow-sm active:scale-95 transition-transform cursor-pointer bg-white border border-brand-border"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-brand-beige to-white group-hover:scale-105 transition-transform duration-500" />
+                  {/* Dynamic Category Image */}
+                  <Image 
+                    src={`/menu-assets/${cat.name.replace(/ /g, '_')}.webp`}
+                    alt={cat.name}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={(e) => {
+                      // Fallback to gradient if image not found
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  {/* Fallback Gradient (visible if image fails to load or before it loads) */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-brand-beige to-white -z-10" />
                   
                   <div className="absolute inset-0 bg-gradient-to-t from-brand-burgundy/90 via-brand-burgundy/20 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-4">
@@ -240,16 +305,30 @@ export default function MenuClient({
         </div>
       )}
 
-      {/* Floating WhatsApp CTA */}
+      {/* Floating Action Button (Cart / WhatsApp) */}
       {settings?.whatsapp && (
-        <a
-          href={`https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fixed bottom-6 left-6 right-6 md:left-auto md:w-72 bg-[#25D366] text-white py-3.5 px-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 font-bold z-20 hover:bg-[#20bd5a] active:scale-95 transition-transform"
+        <button
+          onClick={() => {
+            if (cart.length > 0) {
+              setIsCartOpen(true)
+            } else {
+              window.open(`https://wa.me/${settings.whatsapp?.replace(/\D/g, '')}`, '_blank')
+            }
+          }}
+          className="fixed bottom-6 left-6 right-6 md:left-auto md:w-72 bg-[#25D366] text-white py-3.5 px-4 rounded-2xl shadow-xl flex items-center justify-between gap-2 font-bold z-20 hover:bg-[#20bd5a] active:scale-95 transition-transform"
         >
-          <span>الطلب عبر الواتساب</span>
-        </a>
+          <div className="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+              <path d="M2.25 2.25a.75.75 0 000 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 00-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 000-1.5H5.378A2.25 2.25 0 017.5 15h11.218a.75.75 0 00.674-.421 60.358 60.358 0 002.96-7.228.75.75 0 00-.525-.965A60.864 60.864 0 005.68 4.509l-.232-.867A1.875 1.875 0 003.636 2.25H2.25zM3.75 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM16.5 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z" />
+            </svg>
+            <span>{cart.length > 0 ? 'السلة' : 'الطلب عبر الواتساب'}</span>
+          </div>
+          {cart.length > 0 && (
+            <div className="bg-white text-[#25D366] px-3 py-1 rounded-full text-sm font-black">
+              {cartTotal} {currency}
+            </div>
+          )}
+        </button>
       )}
 
       {/* Item Details Modal */}
@@ -357,11 +436,115 @@ export default function MenuClient({
                 </span>
               </div>
               <button
-                onClick={() => setSelectedItem(null)}
-                className="w-full bg-brand-burgundy text-white py-4 rounded-2xl font-bold text-lg hover:bg-brand-burgundy-dark active:scale-[0.98] transition-all shadow-lg shadow-brand-burgundy/20"
+                onClick={addToCart}
+                disabled={total === null}
+                className="w-full bg-brand-burgundy text-white py-4 rounded-2xl font-bold text-lg hover:bg-brand-burgundy-dark active:scale-[0.98] transition-all shadow-lg shadow-brand-burgundy/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                إضافة للسلة / إغلاق
+                إضافة للسلة
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cart Modal */}
+      {isCartOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsCartOpen(false)}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative w-full max-w-md bg-brand-cream h-[90vh] sm:h-auto sm:max-h-[90vh] sm:rounded-3xl flex flex-col rounded-t-3xl overflow-hidden shadow-2xl transform transition-transform animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
+            
+            {/* Header */}
+            <div className="p-5 bg-white border-b border-brand-border shrink-0 flex justify-between items-center z-10">
+              <h2 className="text-2xl font-bold text-brand-burgundy leading-tight">سلة الطلبات</h2>
+              <button
+                onClick={() => setIsCartOpen(false)}
+                className="bg-brand-beige text-brand-burgundy w-8 h-8 rounded-full flex items-center justify-center hover:bg-brand-border transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Cart Items Scrollable Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {cart.length === 0 ? (
+                <div className="text-center py-10 text-brand-brown/60">
+                  <p>السلة فارغة</p>
+                </div>
+              ) : (
+                cart.map((cartItem) => (
+                  <div key={cartItem.id} className="bg-white rounded-2xl p-4 shadow-sm border border-brand-border flex gap-3">
+                    {cartItem.item.image_url ? (
+                      <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0">
+                        <Image src={cartItem.item.image_url} alt={cartItem.item.name} fill className="object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-brand-beige flex items-center justify-center shrink-0">
+                        <ImageIcon className="w-6 h-6 text-brand-brown/40" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <h4 className="font-bold text-brand-text text-sm leading-tight">{cartItem.item.name}</h4>
+                        <button onClick={() => removeFromCart(cartItem.id)} className="text-red-500 p-1 hover:bg-red-50 rounded">
+                          ✕
+                        </button>
+                      </div>
+                      <p className="text-brand-gold font-semibold text-sm mt-1">{cartItem.total} {currency}</p>
+                      
+                      {/* Selected Options Summary */}
+                      <div className="mt-2 space-y-1">
+                        {cartItem.item.groups.map(group => {
+                          const selectedOptionIds = cartItem.selections[group.id] || []
+                          const selectedOptions = group.options.filter(o => selectedOptionIds.includes(o.id))
+                          if (selectedOptions.length === 0) return null
+                          
+                          return (
+                            <p key={group.id} className="text-xs text-brand-brown">
+                              <span className="font-medium">{group.title}:</span> {selectedOptions.map(o => o.name).join('، ')}
+                            </p>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Bottom Action Bar */}
+            <div className="p-4 bg-white border-t border-brand-border shrink-0">
+              <div className="flex justify-between items-center mb-4 px-2">
+                <span className="text-brand-brown font-medium">الإجمالي</span>
+                <span className="text-2xl font-black text-brand-gold">
+                  {cartTotal} {currency}
+                </span>
+              </div>
+              <a
+                href={cart.length > 0 && settings?.whatsapp ? `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}?text=${generateWhatsAppMessage()}` : '#'}
+                target={cart.length > 0 ? "_blank" : "_self"}
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (cart.length === 0 || !settings?.whatsapp) {
+                    e.preventDefault()
+                  } else {
+                    setIsCartOpen(false)
+                    setCart([]) // Optional: clear cart after sending
+                  }
+                }}
+                className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg ${
+                  cart.length > 0 
+                    ? 'bg-[#25D366] text-white hover:bg-[#20bd5a] shadow-[#25D366]/20 active:scale-[0.98]' 
+                    : 'bg-brand-beige text-brand-brown/50 cursor-not-allowed shadow-none'
+                }`}
+              >
+                إرسال الطلب عبر الواتساب
+              </a>
             </div>
           </div>
         </div>
