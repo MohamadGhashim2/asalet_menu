@@ -1,0 +1,51 @@
+{
+  "restaurant": {
+    "whatsapp": "+966500000000",
+    "currency": "ر.س"
+  },
+  "categories": [
+    {
+      "id": "cat-1",
+      "name": "الأطباق الرئيسية",
+      "sort_order": 1
+    }
+  ],
+  "items": [
+    {
+      "id": "item-1",
+      "category_id": "cat-1",
+      "name": "برجر لحم",
+      "description": "برجر لحم طازج",
+      "base_price": null,
+      "image_url": "/menu-assets/burger.jpg",
+      "sort_order": 1
+    }
+  ],
+  "option_groups": [
+    {
+      "id": "group-1",
+      "item_id": "item-1",
+      "title": "الحجم",
+      "kind": "variant",
+      "selection_type": "single",
+      "is_required": true,
+      "sort_order": 1
+    }
+  ],
+  "options": [
+    {
+      "id": "opt-1",
+      "group_id": "group-1",
+      "name": "سنجل",
+      "price": 25,
+      "sort_order": 1
+    },
+    {
+      "id": "opt-2",
+      "group_id": "group-1",
+      "name": "دبل",
+      "price": 35,
+      "sort_order": 2
+    }
+  ]
+}

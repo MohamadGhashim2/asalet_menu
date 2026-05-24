@@ -1,0 +1,974 @@
+{
+  "categories": [
+    {
+      "id": "cat_0",
+      "name": "الاسماك",
+      "description": "",
+      "sort_order": 0
+    },
+    {
+      "id": "cat_1",
+      "name": "الحلويات",
+      "description": "",
+      "sort_order": 1
+    },
+    {
+      "id": "cat_2",
+      "name": "الذبائح_الولائم",
+      "description": "",
+      "sort_order": 2
+    },
+    {
+      "id": "cat_3",
+      "name": "المقبلات",
+      "description": "",
+      "sort_order": 3
+    },
+    {
+      "id": "cat_4",
+      "name": "طواجن",
+      "description": "",
+      "sort_order": 4
+    },
+    {
+      "id": "cat_5",
+      "name": "مشروبات",
+      "description": "",
+      "sort_order": 5
+    },
+    {
+      "id": "cat_6",
+      "name": "وجبات_اللحم",
+      "description": "",
+      "sort_order": 6
+    },
+    {
+      "id": "cat_7",
+      "name": "وجبات_دجاج",
+      "description": "",
+      "sort_order": 7
+    }
+  ],
+  "items": [
+    {
+      "name": "صالونة جمبري",
+      "description": "",
+      "base_price": 550,
+      "category_id": "cat_0",
+      "sort_order": 0,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%A7%D8%B3%D9%85%D8%A7%D9%83/%D8%B5%D8%A7%D9%84%D9%88%D9%86%D8%A9_%D8%AC%D9%85%D8%A8%D8%B1%D9%8A.webp"
+    },
+    {
+      "name": "سمك سلمون",
+      "description": "",
+      "base_price": 630,
+      "category_id": "cat_0",
+      "sort_order": 1,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%A7%D8%B3%D9%85%D8%A7%D9%83/%D8%B3%D9%85%D9%83%20%D8%B3%D9%84%D9%85%D9%88%D9%86.webp"
+    },
+    {
+      "name": "صالونة سلمون",
+      "description": "",
+      "base_price": 600,
+      "category_id": "cat_0",
+      "sort_order": 2,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "سمك موڤا",
+      "description": "",
+      "base_price": 630,
+      "category_id": "cat_0",
+      "sort_order": 3,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "سمكموفا",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_0",
+      "sort_order": 4,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%A7%D8%B3%D9%85%D8%A7%D9%83/%D8%B3%D9%85%D9%83%D9%85%D9%88%D9%81%D8%A7.webp"
+    },
+    {
+      "name": "صالونة سمك",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_0",
+      "sort_order": 5,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%A7%D8%B3%D9%85%D8%A7%D9%83/%D8%B5%D8%A7%D9%84%D9%88%D9%86%D8%A9_%D8%B3%D9%85%D9%83.webp"
+    },
+    {
+      "name": "معصوب كبير",
+      "description": "",
+      "base_price": 270,
+      "category_id": "cat_1",
+      "sort_order": 0,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%AD%D9%84%D9%88%D9%8A%D8%A7%D8%AA/%D9%85%D8%B9%D8%B5%D9%88%D8%A8_%D9%83%D8%A8%D9%8A%D8%B1.webp"
+    },
+    {
+      "name": "معصوب صغير",
+      "description": "",
+      "base_price": 185,
+      "category_id": "cat_1",
+      "sort_order": 1,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%AD%D9%84%D9%88%D9%8A%D8%A7%D8%AA/%D9%85%D8%B9%D8%B5%D9%88%D8%A8_%D8%B5%D8%BA%D9%8A%D8%B1.webp"
+    },
+    {
+      "name": "عريكة كبير",
+      "description": "",
+      "base_price": 270,
+      "category_id": "cat_1",
+      "sort_order": 2,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%AD%D9%84%D9%88%D9%8A%D8%A7%D8%AA/%D8%B9%D8%B1%D9%8A%D9%83%D8%A9_%D9%83%D8%A8%D9%8A%D8%B1.webp"
+    },
+    {
+      "name": "عريكة صغير",
+      "description": "",
+      "base_price": 185,
+      "category_id": "cat_1",
+      "sort_order": 3,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%AD%D9%84%D9%88%D9%8A%D8%A7%D8%AA/%D8%B9%D8%B1%D9%8A%D9%83%D8%A9_%D8%B5%D8%BA%D9%8A%D8%B1.webp"
+    },
+    {
+      "name": "فتة موز",
+      "description": "",
+      "base_price": 250,
+      "category_id": "cat_1",
+      "sort_order": 4,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%AD%D9%84%D9%88%D9%8A%D8%A7%D8%AA/%D9%81%D8%AA%D8%A9_%D9%85%D9%88%D8%B2.webp"
+    },
+    {
+      "name": "فتة تمر",
+      "description": "",
+      "base_price": 250,
+      "category_id": "cat_1",
+      "sort_order": 5,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%AD%D9%84%D9%88%D9%8A%D8%A7%D8%AA/%D9%81%D8%AA%D8%A9_%D8%AA%D9%85%D8%B1.webp"
+    },
+    {
+      "name": "فتة عسل",
+      "description": "",
+      "base_price": 250,
+      "category_id": "cat_1",
+      "sort_order": 6,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%AD%D9%84%D9%88%D9%8A%D8%A7%D8%AA/%D9%81%D8%AA%D8%A9_%D8%B9%D8%B3%D9%84.webp"
+    },
+    {
+      "name": "خاروف كامل",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_2",
+      "sort_order": 0,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%B0%D8%A8%D8%A7%D8%A6%D8%AD_%D8%A7%D9%84%D9%88%D9%84%D8%A7%D8%A6%D9%85/%D8%AE%D8%A7%D8%B1%D9%88%D9%81_%D9%83%D8%A7%D9%85%D9%84.webp"
+    },
+    {
+      "name": "كتف خاروف",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_2",
+      "sort_order": 1,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%B0%D8%A8%D8%A7%D8%A6%D8%AD_%D8%A7%D9%84%D9%88%D9%84%D8%A7%D8%A6%D9%85/%D9%83%D8%AA%D9%81_%D8%AE%D8%A7%D8%B1%D9%88%D9%81.webp"
+    },
+    {
+      "name": "لحم كتف قطع",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_2",
+      "sort_order": 2,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%B0%D8%A8%D8%A7%D8%A6%D8%AD_%D8%A7%D9%84%D9%88%D9%84%D8%A7%D8%A6%D9%85/%D9%84%D8%AD%D9%85_%D9%83%D8%AA%D9%81_%D9%82%D8%B7%D8%B9.webp"
+    },
+    {
+      "name": "نصف خاروف",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_2",
+      "sort_order": 3,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D8%B0%D8%A8%D8%A7%D8%A6%D8%AD_%D8%A7%D9%84%D9%88%D9%84%D8%A7%D8%A6%D9%85/%D9%86%D8%B5%D9%81_%D8%AE%D8%A7%D8%B1%D9%88%D9%81.webp"
+    },
+    {
+      "name": "سحاوق بالجبن",
+      "description": "",
+      "base_price": 60,
+      "category_id": "cat_3",
+      "sort_order": 0,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B3%D8%AD%D8%A7%D9%88%D9%82_%D8%A8%D8%A7%D9%84%D8%AC%D8%A8%D9%86.webp"
+    },
+    {
+      "name": "سلطة مشكلة",
+      "description": "",
+      "base_price": 350,
+      "category_id": "cat_3",
+      "sort_order": 1,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B3%D9%84%D8%B7%D8%A9_%D9%85%D8%B4%D9%83%D9%84%D8%A9.webp"
+    },
+    {
+      "name": "صوص حار",
+      "description": "",
+      "base_price": 50,
+      "category_id": "cat_3",
+      "sort_order": 2,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B5%D9%88%D8%B5_%D8%AD%D8%A7%D8%B1.webp"
+    },
+    {
+      "name": "سلطة ذرة",
+      "description": "",
+      "base_price": 230,
+      "category_id": "cat_3",
+      "sort_order": 3,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B3%D9%84%D8%B7%D8%A9_%D8%B0%D8%B1%D8%A9.webp"
+    },
+    {
+      "name": "سلطة يونانية",
+      "description": "",
+      "base_price": 230,
+      "category_id": "cat_3",
+      "sort_order": 4,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B3%D9%84%D8%B7%D8%A9_%D9%8A%D9%88%D9%86%D8%A7%D9%86%D9%8A%D8%A9.webp"
+    },
+    {
+      "name": "سلطة جرجير",
+      "description": "",
+      "base_price": 230,
+      "category_id": "cat_3",
+      "sort_order": 5,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B3%D9%84%D8%B7%D8%A9_%D8%AC%D8%B1%D8%AC%D9%8A%D8%B1.webp"
+    },
+    {
+      "name": "فتوش",
+      "description": "",
+      "base_price": 230,
+      "category_id": "cat_3",
+      "sort_order": 6,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D9%81%D8%AA%D9%88%D8%B4.webp"
+    },
+    {
+      "name": "سلطة عربية",
+      "description": "",
+      "base_price": 210,
+      "category_id": "cat_3",
+      "sort_order": 7,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B3%D9%84%D8%B7%D8%A9_%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9.webp"
+    },
+    {
+      "name": "طبق خضار",
+      "description": "",
+      "base_price": 35,
+      "category_id": "cat_3",
+      "sort_order": 8,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B7%D8%A8%D9%82_%D8%AE%D8%B6%D8%A7%D8%B1.webp"
+    },
+    {
+      "name": "متبل باذنجان",
+      "description": "",
+      "base_price": 150,
+      "category_id": "cat_3",
+      "sort_order": 9,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D9%85%D8%AA%D8%A8%D9%84_%D8%A8%D8%A7%D8%B0%D9%86%D8%AC%D8%A7%D9%86.webp"
+    },
+    {
+      "name": "حمص ناعم",
+      "description": "",
+      "base_price": 150,
+      "category_id": "cat_3",
+      "sort_order": 10,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%AD%D9%85%D8%B5_%D9%86%D8%A7%D8%B9%D9%85.webp"
+    },
+    {
+      "name": "سحاوق اضافي",
+      "description": "",
+      "base_price": 50,
+      "category_id": "cat_3",
+      "sort_order": 11,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B3%D8%AD%D8%A7%D9%88%D9%82_%D8%A7%D8%B6%D8%A7%D9%81%D9%8A.webp"
+    },
+    {
+      "name": "لبن بخيار",
+      "description": "",
+      "base_price": 65,
+      "category_id": "cat_3",
+      "sort_order": 12,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D9%84%D8%A8%D9%86_%D8%A8%D8%AE%D9%8A%D8%A7%D8%B1.webp"
+    },
+    {
+      "name": "مكسرات",
+      "description": "",
+      "base_price": 90,
+      "category_id": "cat_3",
+      "sort_order": 13,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D9%85%D9%83%D8%B3%D8%B1%D8%A7%D8%AA.webp"
+    },
+    {
+      "name": "زبيب",
+      "description": "",
+      "base_price": 65,
+      "category_id": "cat_3",
+      "sort_order": 14,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B2%D8%A8%D9%8A%D8%A8.webp"
+    },
+    {
+      "name": "مرق لحم",
+      "description": "",
+      "base_price": 35,
+      "category_id": "cat_3",
+      "sort_order": 15,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D9%85%D8%B1%D9%82_%D9%84%D8%AD%D9%85.webp"
+    },
+    {
+      "name": "بطاطا",
+      "description": "",
+      "base_price": 170,
+      "category_id": "cat_3",
+      "sort_order": 16,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%A8%D8%B7%D8%A7%D8%B7%D8%A7.webp"
+    },
+    {
+      "name": "طبق رز صغير",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_3",
+      "sort_order": 17,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B7%D8%A8%D9%82_%D8%B1%D8%B2_%D8%B5%D8%BA%D9%8A%D8%B1.webp"
+    },
+    {
+      "name": "طبق رز كبير",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_3",
+      "sort_order": 18,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%A7%D9%84%D9%85%D9%82%D8%A8%D9%84%D8%A7%D8%AA/%D8%B7%D8%A8%D9%82_%D8%B1%D8%B2_%D9%83%D8%A8%D9%8A%D8%B1.webp"
+    },
+    {
+      "name": "فحسة لحم",
+      "description": "",
+      "base_price": 660,
+      "category_id": "cat_4",
+      "sort_order": 0,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D9%81%D8%AD%D8%B3%D8%A9%20%D9%84%D8%AD%D9%85.webp"
+    },
+    {
+      "name": "سلتة",
+      "description": "",
+      "base_price": 530,
+      "category_id": "cat_4",
+      "sort_order": 1,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D8%B3%D9%84%D8%AA%D8%A9.webp"
+    },
+    {
+      "name": "صالونة لحم",
+      "description": "",
+      "base_price": 640,
+      "category_id": "cat_4",
+      "sort_order": 2,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D8%B5%D8%A7%D9%84%D9%88%D9%86%D8%A9%20%D9%84%D8%AD%D9%85.webp"
+    },
+    {
+      "name": "كبدة لحم",
+      "description": "",
+      "base_price": 560,
+      "category_id": "cat_4",
+      "sort_order": 3,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D9%83%D8%A8%D8%AF%D8%A9%20%D9%84%D8%AD%D9%85.webp"
+    },
+    {
+      "name": "مقلقل دجاج",
+      "description": "",
+      "base_price": 350,
+      "category_id": "cat_4",
+      "sort_order": 4,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D9%85%D9%82%D9%84%D9%82%D9%84%20%D8%AF%D8%AC%D8%A7%D8%AC.webp"
+    },
+    {
+      "name": "عقدة دجاج",
+      "description": "",
+      "base_price": 330,
+      "category_id": "cat_4",
+      "sort_order": 5,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D8%B9%D9%82%D8%AF%D8%A9%20%D8%AF%D8%AC%D8%A7%D8%AC.webp"
+    },
+    {
+      "name": "صالونة دجاج",
+      "description": "",
+      "base_price": 330,
+      "category_id": "cat_4",
+      "sort_order": 6,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "بامية باللحم",
+      "description": "",
+      "base_price": 580,
+      "category_id": "cat_4",
+      "sort_order": 7,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "بامية سادة",
+      "description": "",
+      "base_price": 300,
+      "category_id": "cat_4",
+      "sort_order": 8,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D8%A8%D8%A7%D9%85%D9%8A%D8%A9%20%D8%B3%D8%A7%D8%AF%D8%A9.webp"
+    },
+    {
+      "name": "فاصوليا",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_4",
+      "sort_order": 9,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D9%81%D8%A7%D8%B5%D9%88%D9%84%D9%8A%D8%A7.webp"
+    },
+    {
+      "name": "فول يمني",
+      "description": "",
+      "base_price": 240,
+      "category_id": "cat_4",
+      "sort_order": 10,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D9%81%D9%88%D9%84%20%D9%8A%D9%85%D9%86%D9%8A.webp"
+    },
+    {
+      "name": "خبز ملوٌح",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_4",
+      "sort_order": 11,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "رطب",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_4",
+      "sort_order": 12,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D8%B1%D8%B7%D8%A8.webp"
+    },
+    {
+      "name": "بامية للحم",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_4",
+      "sort_order": 13,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D8%A8%D8%A7%D9%85%D9%8A%D8%A9%20%D9%84%D9%84%D8%AD%D9%85.webp"
+    },
+    {
+      "name": "خبز ملوح",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_4",
+      "sort_order": 14,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D8%AE%D8%A8%D8%B2%20%D9%85%D9%84%D9%88%D8%AD.webp"
+    },
+    {
+      "name": "صالونةدجاج",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_4",
+      "sort_order": 15,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D8%B5%D8%A7%D9%84%D9%88%D9%86%D8%A9%D8%AF%D8%AC%D8%A7%D8%AC.webp"
+    },
+    {
+      "name": "يجب ان يكون هناك لكل هذه الاططباق اضافات مدفوعة ",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_4",
+      "sort_order": 16,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D8%B7%D9%88%D8%A7%D8%AC%D9%86/%D9%8A%D8%AC%D8%A8%20%D8%A7%D9%86%20%D9%8A%D9%83%D9%88%D9%86%20%D9%87%D9%86%D8%A7%D9%83%20%D9%84%D9%83%D9%84%20%D9%87%D8%B0%D9%87%20%D8%A7%D9%84%D8%A7%D8%B7%D8%B7%D8%A8%D8%A7%D9%82%20%D8%A7%D8%B6%D8%A7%D9%81%D8%A7%D8%AA%20%D9%85%D8%AF%D9%81%D9%88%D8%B9%D8%A9%20.png"
+    },
+    {
+      "name": "كولا ترك",
+      "description": "",
+      "base_price": 50,
+      "category_id": "cat_5",
+      "sort_order": 0,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%85%D8%B4%D8%B1%D9%88%D8%A8%D8%A7%D8%AA/%D9%83%D9%88%D9%84%D8%A7_%D8%AA%D8%B1%D9%83_1_%D9%84%D8%AA%D8%B1.webp"
+    },
+    {
+      "name": "برتقال",
+      "description": "",
+      "base_price": 50,
+      "category_id": "cat_5",
+      "sort_order": 1,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%85%D8%B4%D8%B1%D9%88%D8%A8%D8%A7%D8%AA/%D8%A8%D8%B1%D8%AA%D9%82%D8%A7%D9%84.webp"
+    },
+    {
+      "name": "ليمون",
+      "description": "",
+      "base_price": 50,
+      "category_id": "cat_5",
+      "sort_order": 2,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%85%D8%B4%D8%B1%D9%88%D8%A8%D8%A7%D8%AA/%D9%84%D9%8A%D9%85%D9%88%D9%86.webp"
+    },
+    {
+      "name": "تفاح",
+      "description": "",
+      "base_price": 50,
+      "category_id": "cat_5",
+      "sort_order": 3,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%85%D8%B4%D8%B1%D9%88%D8%A8%D8%A7%D8%AA/%D8%AA%D9%81%D8%A7%D8%AD.webp"
+    },
+    {
+      "name": "توت بري",
+      "description": "",
+      "base_price": 40,
+      "category_id": "cat_5",
+      "sort_order": 4,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%85%D8%B4%D8%B1%D9%88%D8%A8%D8%A7%D8%AA/%D8%AA%D9%88%D8%AA_%D8%A8%D8%B1%D9%8A.webp"
+    },
+    {
+      "name": "كولا تورك 1 لتر",
+      "description": "",
+      "base_price": 80,
+      "category_id": "cat_5",
+      "sort_order": 5,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "عيران 1 لتر",
+      "description": "",
+      "base_price": 80,
+      "category_id": "cat_5",
+      "sort_order": 6,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%85%D8%B4%D8%B1%D9%88%D8%A8%D8%A7%D8%AA/%D8%B9%D9%8A%D8%B1%D8%A7%D9%86_1_%D9%84%D8%AA%D8%B1.webp"
+    },
+    {
+      "name": "عيران 385م",
+      "description": "",
+      "base_price": 40,
+      "category_id": "cat_5",
+      "sort_order": 7,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%85%D8%B4%D8%B1%D9%88%D8%A8%D8%A7%D8%AA/%D8%B9%D9%8A%D8%B1%D8%A7%D9%86_385%D9%85.webp"
+    },
+    {
+      "name": "مياه 500م",
+      "description": "",
+      "base_price": 25,
+      "category_id": "cat_5",
+      "sort_order": 8,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%85%D8%B4%D8%B1%D9%88%D8%A8%D8%A7%D8%AA/%D9%85%D9%8A%D8%A7%D9%87_500%D9%85.webp"
+    },
+    {
+      "name": "مندي لحم جامبو",
+      "description": "",
+      "base_price": 1090,
+      "category_id": "cat_6",
+      "sort_order": 0,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%A7%D9%84%D9%84%D8%AD%D9%85/%D9%85%D9%86%D8%AF%D9%8A%20%D9%84%D8%AD%D9%85%20%D8%AC%D8%A7%D9%85%D8%A8%D9%88.webp"
+    },
+    {
+      "name": "مندي لحم عادي",
+      "description": "",
+      "base_price": 780,
+      "category_id": "cat_6",
+      "sort_order": 1,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%A7%D9%84%D9%84%D8%AD%D9%85/%D9%85%D9%86%D8%AF%D9%8A%20%D9%84%D8%AD%D9%85%20%D8%B9%D8%A7%D8%AF%D9%8A.webp"
+    },
+    {
+      "name": "مضغوط لحم جامبو",
+      "description": "",
+      "base_price": 1090,
+      "category_id": "cat_6",
+      "sort_order": 2,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%A7%D9%84%D9%84%D8%AD%D9%85/%D9%85%D8%B6%D8%BA%D9%88%D8%B7%20%D9%84%D8%AD%D9%85%20%D8%AC%D8%A7%D9%85%D8%A8%D9%88.webp"
+    },
+    {
+      "name": "مضغوط لحم عادي",
+      "description": "",
+      "base_price": 780,
+      "category_id": "cat_6",
+      "sort_order": 3,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%A7%D9%84%D9%84%D8%AD%D9%85/%D9%85%D8%B6%D8%BA%D9%88%D8%B7%20%D9%84%D8%AD%D9%85%20%D8%B9%D8%A7%D8%AF%D9%8A.webp"
+    },
+    {
+      "name": "زربيان لحم جامبو",
+      "description": "",
+      "base_price": 1100,
+      "category_id": "cat_6",
+      "sort_order": 4,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%A7%D9%84%D9%84%D8%AD%D9%85/%D8%B2%D8%B1%D8%A8%D9%8A%D8%A7%D9%86%20%D9%84%D8%AD%D9%85%20%D8%AC%D8%A7%D9%85%D8%A8%D9%88.webp"
+    },
+    {
+      "name": "زربيان لحم عادي",
+      "description": "",
+      "base_price": 790,
+      "category_id": "cat_6",
+      "sort_order": 5,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%A7%D9%84%D9%84%D8%AD%D9%85/%D8%B2%D8%B1%D8%A8%D9%8A%D8%A7%D9%86%20%D9%84%D8%AD%D9%85%20%D8%B9%D8%A7%D8%AF%D9%8A.webp"
+    },
+    {
+      "name": "مدفون لحم جامبو",
+      "description": "",
+      "base_price": 1100,
+      "category_id": "cat_6",
+      "sort_order": 6,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%A7%D9%84%D9%84%D8%AD%D9%85/%D9%85%D8%AF%D9%81%D9%88%D9%86%20%D9%84%D8%AD%D9%85%20%D8%AC%D8%A7%D9%85%D8%A8%D9%88.webp"
+    },
+    {
+      "name": "مدفون لحم عادي",
+      "description": "",
+      "base_price": 790,
+      "category_id": "cat_6",
+      "sort_order": 7,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%A7%D9%84%D9%84%D8%AD%D9%85/%D9%85%D8%AF%D9%81%D9%88%D9%86%20%D9%84%D8%AD%D9%85%20%D8%B9%D8%A7%D8%AF%D9%8A.webp"
+    },
+    {
+      "name": "يجب ان يكون هناك لكل هذه الاططباق اضافات مدفوعة ",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_6",
+      "sort_order": 8,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%A7%D9%84%D9%84%D8%AD%D9%85/%D9%8A%D8%AC%D8%A8%20%D8%A7%D9%86%20%D9%8A%D9%83%D9%88%D9%86%20%D9%87%D9%86%D8%A7%D9%83%20%D9%84%D9%83%D9%84%20%D9%87%D8%B0%D9%87%20%D8%A7%D9%84%D8%A7%D8%B7%D8%B7%D8%A8%D8%A7%D9%82%20%D8%A7%D8%B6%D8%A7%D9%81%D8%A7%D8%AA%20%D9%85%D8%AF%D9%81%D9%88%D8%B9%D8%A9%20.png"
+    },
+    {
+      "name": "مندي دجاج/ نصف",
+      "description": "",
+      "base_price": 350,
+      "category_id": "cat_7",
+      "sort_order": 0,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "مندي دجاج/ ربع",
+      "description": "",
+      "base_price": 260,
+      "category_id": "cat_7",
+      "sort_order": 1,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "مضغوط دجاج/ نصف",
+      "description": "",
+      "base_price": 350,
+      "category_id": "cat_7",
+      "sort_order": 2,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "مضغوط دجاج/ ربع",
+      "description": "",
+      "base_price": 260,
+      "category_id": "cat_7",
+      "sort_order": 3,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "زربيان دجاج/ نصف",
+      "description": "",
+      "base_price": 360,
+      "category_id": "cat_7",
+      "sort_order": 4,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "زربيان دجاج/ ربع",
+      "description": "",
+      "base_price": 270,
+      "category_id": "cat_7",
+      "sort_order": 5,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "مدفون دجاج/ نصف",
+      "description": "",
+      "base_price": 360,
+      "category_id": "cat_7",
+      "sort_order": 6,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "مدفون دجاج/ ربع",
+      "description": "",
+      "base_price": 270,
+      "category_id": "cat_7",
+      "sort_order": 7,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "مشكل دجاج/نصف",
+      "description": "",
+      "base_price": 1400,
+      "category_id": "cat_7",
+      "sort_order": 8,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": "مشكل دجاج/ربع",
+      "description": "",
+      "base_price": 1060,
+      "category_id": "cat_7",
+      "sort_order": 9,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": null
+    },
+    {
+      "name": " 350مندي دجاج نصف",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 10,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/_350%D9%85%D9%86%D8%AF%D9%8A_%D8%AF%D8%AC%D8%A7%D8%AC_%D9%86%D8%B5%D9%81.webp"
+    },
+    {
+      "name": "زربيان دجاج 360",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 11,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D8%B2%D8%B1%D8%A8%D9%8A%D8%A7%D9%86_%D8%AF%D8%AC%D8%A7%D8%AC_360.webp"
+    },
+    {
+      "name": "زربيان دجاجربع",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 12,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D8%B2%D8%B1%D8%A8%D9%8A%D8%A7%D9%86_%D8%AF%D8%AC%D8%A7%D8%AC%D8%B1%D8%A8%D8%B9.webp"
+    },
+    {
+      "name": "مدفون دجاج ربع",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 13,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D9%85%D8%AF%D9%81%D9%88%D9%86_%D8%AF%D8%AC%D8%A7%D8%AC_%D8%B1%D8%A8%D8%B9.webp"
+    },
+    {
+      "name": "مدفون دجاج نصف",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 14,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D9%85%D8%AF%D9%81%D9%88%D9%86_%D8%AF%D8%AC%D8%A7%D8%AC_%D9%86%D8%B5%D9%81.webp"
+    },
+    {
+      "name": "مشكل دجاج ربع 1060",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 15,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D9%85%D8%B4%D9%83%D9%84_%D8%AF%D8%AC%D8%A7%D8%AC_%D8%B1%D8%A8%D8%B9_1060.webp"
+    },
+    {
+      "name": "مشكل دجاجنصف  1400",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 16,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D9%85%D8%B4%D9%83%D9%84_%D8%AF%D8%AC%D8%A7%D8%AC%D9%86%D8%B5%D9%81__1400.webp"
+    },
+    {
+      "name": "مضغوط دجاج ربع",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 17,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D9%85%D8%B6%D8%BA%D9%88%D8%B7_%D8%AF%D8%AC%D8%A7%D8%AC_%D8%B1%D8%A8%D8%B9.webp"
+    },
+    {
+      "name": "مضغوط دجاج نصف",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 18,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D9%85%D8%B6%D8%BA%D9%88%D8%B7_%D8%AF%D8%AC%D8%A7%D8%AC_%D9%86%D8%B5%D9%81.webp"
+    },
+    {
+      "name": "مندي دجاج ربع260",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 19,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D9%85%D9%86%D8%AF%D9%8A_%D8%AF%D8%AC%D8%A7%D8%AC_%D8%B1%D8%A8%D8%B9260.webp"
+    },
+    {
+      "name": "يجب ان يكون هناك لكل هذه الاططباق اضافات مدفوعة ",
+      "description": "",
+      "base_price": 0,
+      "category_id": "cat_7",
+      "sort_order": 20,
+      "is_available": true,
+      "is_featured": false,
+      "image_url": "/menu-assets/%D9%88%D8%AC%D8%A8%D8%A7%D8%AA_%D8%AF%D8%AC%D8%A7%D8%AC/%D9%8A%D8%AC%D8%A8%20%D8%A7%D9%86%20%D9%8A%D9%83%D9%88%D9%86%20%D9%87%D9%86%D8%A7%D9%83%20%D9%84%D9%83%D9%84%20%D9%87%D8%B0%D9%87%20%D8%A7%D9%84%D8%A7%D8%B7%D8%B7%D8%A8%D8%A7%D9%82%20%D8%A7%D8%B6%D8%A7%D9%81%D8%A7%D8%AA%20%D9%85%D8%AF%D9%81%D9%88%D8%B9%D8%A9%20.png"
+    }
+  ]
+}
