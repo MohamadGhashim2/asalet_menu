@@ -52,6 +52,12 @@ export default function CategoriesPage() {
       .select()
       .single()
 
+    if (error) {
+      alert('حدث خطأ أثناء الإضافة: ' + error.message)
+      console.error(error)
+      return
+    }
+
     if (data) {
       setCategories([...categories, data].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
       setIsAdding(false)
@@ -69,10 +75,14 @@ export default function CategoriesPage() {
       .update({ name: editName, sort_order: editSort, image_url: editImageUrl })
       .eq('id', id)
 
-    if (!error) {
-      setCategories(categories.map(c => c.id === id ? { ...c, name: editName, sort_order: editSort, image_url: editImageUrl } : c).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
-      setIsEditing(null)
+    if (error) {
+      alert('حدث خطأ أثناء التحديث: ' + error.message)
+      console.error(error)
+      return
     }
+
+    setCategories(categories.map(c => c.id === id ? { ...c, name: editName, sort_order: editSort, image_url: editImageUrl } : c).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
+    setIsEditing(null)
   }
 
   async function handleDelete(id: string) {
@@ -120,7 +130,12 @@ export default function CategoriesPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">صورة القسم</label>
-            <ImageUploader value={newImageUrl} onChange={setNewImageUrl} />
+            <ImageUploader 
+              value={newImageUrl} 
+              onChange={setNewImageUrl} 
+              folder="categories"
+              helperText="ستظهر هذه الصورة في الصفحة الرئيسية للأقسام"
+            />
           </div>
           <div className="flex gap-2">
             <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">حفظ</button>
@@ -145,7 +160,11 @@ export default function CategoriesPage() {
                 <td className="px-6 py-4 whitespace-nowrap">
                   {isEditing === category.id ? (
                     <div className="w-32">
-                      <ImageUploader value={editImageUrl} onChange={setEditImageUrl} />
+                      <ImageUploader 
+                        value={editImageUrl} 
+                        onChange={setEditImageUrl} 
+                        folder="categories"
+                      />
                     </div>
                   ) : (
                     category.image_url ? (
