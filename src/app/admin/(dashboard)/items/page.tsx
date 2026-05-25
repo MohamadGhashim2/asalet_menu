@@ -20,6 +20,7 @@ export default function ItemsPage() {
       .from('menu_items')
       .select('*, categories(name)')
       .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true })
     
     if (data) {
       setItems(data as never[])
@@ -45,11 +46,19 @@ export default function ItemsPage() {
   // Group items by category
   const itemsByCategory: Record<string, typeof items> = {}
   items.forEach(item => {
-    const catName = item.categories?.name || 'غير محدد (بدون قسم)'
+    const catName = item.categories?.name || 'بدون قسم'
     if (!itemsByCategory[catName]) {
       itemsByCategory[catName] = []
     }
     itemsByCategory[catName].push(item)
+  })
+
+  // Sort categories alphabetically using Arabic collation
+  const collator = new Intl.Collator('ar')
+  const sortedCategories = Object.keys(itemsByCategory).sort((a, b) => {
+    if (a === 'بدون قسم') return 1
+    if (b === 'بدون قسم') return -1
+    return collator.compare(a, b)
   })
 
   return (
@@ -71,7 +80,9 @@ export default function ItemsPage() {
         </div>
       ) : (
         <div className="space-y-8">
-          {Object.entries(itemsByCategory).map(([catName, catItems]) => (
+          {sortedCategories.map((catName) => {
+            const catItems = itemsByCategory[catName]
+            return (
             <div key={catName} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="bg-brand-cream border-b border-gray-100 px-6 py-4 flex items-center gap-3">
                 <Folder className="w-5 h-5 text-brand-burgundy" />
@@ -118,7 +129,7 @@ export default function ItemsPage() {
                 </tbody>
               </table>
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>

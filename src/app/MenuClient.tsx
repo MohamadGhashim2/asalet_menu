@@ -152,19 +152,18 @@ export default function MenuClient({
 
         {/* Compact Restaurant Header */}
         <div className="bg-[#FFFDF9] pt-10 pb-8 px-5 border-b border-brand-border flex flex-col items-center text-center">
-          <div className="w-24 h-24 mb-4 flex items-center justify-center">
+          <div className="w-64 h-64 mb-4 flex items-center justify-center">
             <Image
               src="/logo.png"
               alt="Asalet Mandi Logo"
-              width={96}
-              height={96}
+              width={192}
+              height={192}
               className="object-contain drop-shadow-sm"
               priority
             />
           </div>
-          <h1 className="text-[28px] md:text-[32px] font-black mb-1.5 tracking-tight text-brand-burgundy">مطعم أصالة المندي</h1>
+          <h1 className="text-[28px] md:text-[32px] font-black mb-1.5 tracking-tight text-brand-burgundy"></h1>
           <p className="text-brand-brown text-[15px] md:text-[16px] font-medium">
-            طعم الأصالة في كل طبق
           </p>
         </div>
 

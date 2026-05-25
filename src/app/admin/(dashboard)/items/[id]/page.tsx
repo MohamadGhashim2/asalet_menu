@@ -40,11 +40,13 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
   const [groups, setGroups] = useState<(OptionGroup & { options: Option[] })[]>([])
 
   async function fetchData() {
-    const { data: cats } = await supabase.from('categories').select('*').order('sort_order')
+    const { data: cats } = await supabase.from('categories').select('*')
     if (cats) {
-      setCategories(cats)
-      if (cats.length > 0 && !item.category_id) {
-        setItem(prev => ({ ...prev, category_id: cats[0].id }))
+      const collator = new Intl.Collator('ar')
+      const sortedCats = cats.sort((a, b) => collator.compare(a.name, b.name))
+      setCategories(sortedCats)
+      if (sortedCats.length > 0 && !item.category_id) {
+        setItem(prev => ({ ...prev, category_id: sortedCats[0].id }))
       }
     }
 
