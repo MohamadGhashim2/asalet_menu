@@ -192,7 +192,7 @@ export default function MenuClient({
                 >
                   {/* Dynamic Category Image */}
                   <Image 
-                    src={`/menu-assets/${cat.name.replace(/ /g, '_')}.webp`}
+                    src={cat.image_url || `/menu-assets/${cat.name.replace(/ /g, '_')}.webp`}
                     alt={cat.name}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -204,9 +204,10 @@ export default function MenuClient({
                   {/* Fallback Gradient (visible if image fails to load or before it loads) */}
                   <div className="absolute inset-0 bg-gradient-to-br from-brand-beige to-white -z-10" />
                   
-                  <div className="absolute inset-0 bg-gradient-to-t from-brand-burgundy/90 via-brand-burgundy/20 to-transparent" />
+                  {/* Dark overlay for readability */}
+                  <div className="absolute inset-0 bg-black/40" />
                   <div className="absolute inset-x-0 bottom-0 p-4">
-                    <h3 className="text-brand-cream font-bold text-lg leading-tight drop-shadow-sm">{cat.name}</h3>
+                    <h3 className="text-white font-bold text-lg leading-tight drop-shadow-md">{cat.name}</h3>
                   </div>
                 </div>
               ))}

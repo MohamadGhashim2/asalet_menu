@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/supabase'
-import { Plus, Edit2, Trash2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon } from 'lucide-react'
+import ImageUploader from '../../components/ImageUploader'
+import Image from 'next/image'
 
 type Category = Database['public']['Tables']['categories']['Row']
 
@@ -16,6 +18,9 @@ export default function CategoriesPage() {
   const [isAdding, setIsAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [newSort, setNewSort] = useState(0)
+  const [newImageUrl, setNewImageUrl] = useState<string | null>(null)
+  
+  const [editImageUrl, setEditImageUrl] = useState<string | null>(null)
   
   const supabase = createClient()
 
@@ -43,7 +48,7 @@ export default function CategoriesPage() {
 
     const { data, error } = await supabase
       .from('categories')
-      .insert({ name: newName, sort_order: newSort })
+      .insert({ name: newName, sort_order: newSort, image_url: newImageUrl })
       .select()
       .single()
 
@@ -52,6 +57,7 @@ export default function CategoriesPage() {
       setIsAdding(false)
       setNewName('')
       setNewSort(0)
+      setNewImageUrl(null)
     }
   }
 
@@ -60,11 +66,11 @@ export default function CategoriesPage() {
 
     const { error } = await supabase
       .from('categories')
-      .update({ name: editName, sort_order: editSort })
+      .update({ name: editName, sort_order: editSort, image_url: editImageUrl })
       .eq('id', id)
 
     if (!error) {
-      setCategories(categories.map(c => c.id === id ? { ...c, name: editName, sort_order: editSort } : c).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
+      setCategories(categories.map(c => c.id === id ? { ...c, name: editName, sort_order: editSort, image_url: editImageUrl } : c).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
       setIsEditing(null)
     }
   }
@@ -82,6 +88,7 @@ export default function CategoriesPage() {
     setIsEditing(c.id)
     setEditName(c.name)
     setEditSort(c.sort_order || 0)
+    setEditImageUrl(c.image_url || null)
   }
 
   if (loading) return <div>جاري التحميل...</div>
@@ -100,14 +107,20 @@ export default function CategoriesPage() {
       </div>
 
       {isAdding && (
-        <form onSubmit={handleAdd} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex gap-4 items-end">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">الاسم</label>
-            <input required type="text" className="w-full px-3 py-2 border rounded-md" value={newName} onChange={e => setNewName(e.target.value)} />
+        <form onSubmit={handleAdd} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-4">
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">الاسم</label>
+              <input required type="text" className="w-full px-3 py-2 border rounded-md" value={newName} onChange={e => setNewName(e.target.value)} />
+            </div>
+            <div className="w-32">
+              <label className="block text-sm font-medium text-gray-700 mb-1">الترتيب</label>
+              <input type="number" className="w-full px-3 py-2 border rounded-md" value={newSort} onChange={e => setNewSort(parseInt(e.target.value) || 0)} />
+            </div>
           </div>
-          <div className="w-32">
-            <label className="block text-sm font-medium text-gray-700 mb-1">الترتيب</label>
-            <input type="number" className="w-full px-3 py-2 border rounded-md" value={newSort} onChange={e => setNewSort(parseInt(e.target.value) || 0)} />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">صورة القسم</label>
+            <ImageUploader value={newImageUrl} onChange={setNewImageUrl} />
           </div>
           <div className="flex gap-2">
             <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">حفظ</button>
@@ -120,6 +133,7 @@ export default function CategoriesPage() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الصورة</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاسم</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الترتيب</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
@@ -128,6 +142,23 @@ export default function CategoriesPage() {
           <tbody className="bg-white divide-y divide-gray-200">
             {categories.map((category) => (
               <tr key={category.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {isEditing === category.id ? (
+                    <div className="w-32">
+                      <ImageUploader value={editImageUrl} onChange={setEditImageUrl} />
+                    </div>
+                  ) : (
+                    category.image_url ? (
+                      <div className="relative w-12 h-12 rounded bg-gray-100 border overflow-hidden">
+                        <Image src={category.image_url} alt={category.name} fill className="object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded bg-gray-100 border flex items-center justify-center">
+                        <ImageIcon className="w-5 h-5 text-gray-400" />
+                      </div>
+                    )
+                  )}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {isEditing === category.id ? (
                     <input type="text" className="w-full px-2 py-1 border rounded" value={editName} onChange={e => setEditName(e.target.value)} />
@@ -159,7 +190,7 @@ export default function CategoriesPage() {
             ))}
             {categories.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">لا يوجد أقسام</td>
+                <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">لا يوجد أقسام</td>
               </tr>
             )}
           </tbody>

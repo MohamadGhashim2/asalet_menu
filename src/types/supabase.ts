@@ -41,6 +41,7 @@ export interface Database {
           id: string
           name: string
           description: string | null
+          image_url: string | null
           sort_order: number | null
           is_active: boolean | null
           created_at: string | null
@@ -50,6 +51,7 @@ export interface Database {
           id?: string
           name: string
           description?: string | null
+          image_url?: string | null
           sort_order?: number | null
           is_active?: boolean | null
           created_at?: string | null
@@ -59,6 +61,7 @@ export interface Database {
           id?: string
           name?: string
           description?: string | null
+          image_url?: string | null
           sort_order?: number | null
           is_active?: boolean | null
           created_at?: string | null

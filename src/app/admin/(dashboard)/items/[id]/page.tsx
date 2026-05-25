@@ -191,16 +191,25 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
         </button>
       </form>
 
-      {!isNew && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center mt-8">
-            <h2 className="text-xl font-bold text-gray-900">مجموعات الخيارات (Variants/Addons)</h2>
-            <button type="button" onClick={addGroup} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 text-sm">
-              <Plus className="w-4 h-4" /> إضافة مجموعة
-            </button>
-          </div>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center mt-8">
+          <h2 className="text-xl font-bold text-gray-900">مجموعات الخيارات (Variants/Addons)</h2>
+          <button 
+            type="button" 
+            onClick={addGroup} 
+            disabled={isNew}
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm ${isNew ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
+          >
+            <Plus className="w-4 h-4" /> إضافة مجموعة
+          </button>
+        </div>
 
-          {groups.map(group => (
+        {isNew ? (
+          <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-500">
+            يرجى حفظ المنتج أولاً لتتمكن من إضافة الخيارات والتعديلات
+          </div>
+        ) : (
+          groups.map(group => (
             <div key={group.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <div className="flex gap-4 mb-4 items-end">
                 <div className="flex-1">
@@ -233,8 +242,8 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                 <div className="space-y-2">
                   {group.options.map(opt => (
                     <div key={opt.id} className="flex gap-2 items-center bg-white p-2 rounded border">
-                      <input type="text" className="flex-1 px-2 py-1 border rounded text-sm" value={opt.name} onChange={e => updateOption(group.id, opt.id, { name: e.target.value })} placeholder="الاسم" />
-                      <input type="number" className="w-24 px-2 py-1 border rounded text-sm" value={opt.price || 0} onChange={e => updateOption(group.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder="السعر" />
+                      <input type="text" className="flex-1 px-2 py-1 border rounded text-sm" value={opt.name} onChange={e => updateOption(group.id, opt.id, { name: e.target.value })} placeholder="الاسم (مثال: حجم كبير)" />
+                      <input type="number" className="w-32 px-2 py-1 border rounded text-sm" value={opt.price || 0} onChange={e => updateOption(group.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder="السعر الإضافي" />
                       <button onClick={() => deleteOption(group.id, opt.id)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   ))}
@@ -244,9 +253,9 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   )
 }
