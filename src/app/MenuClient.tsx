@@ -148,10 +148,10 @@ export default function MenuClient({
 
   return (
     <div className="min-h-screen bg-brand-cream font-sans selection:bg-brand-burgundy/20 flex justify-center">
-      <div className="w-full max-w-6xl bg-[#FFFDF9] min-h-screen shadow-2xl relative pb-28 flex flex-col md:border-x md:border-brand-border">
+      <div className="w-full max-w-6xl bg-[#fbf9f7] min-h-screen shadow-2xl relative pb-28 flex flex-col md:border-x md:border-brand-border">
 
         {/* Compact Restaurant Header */}
-        <div className="bg-[#FFFDF9] pt-10 pb-8 px-5 border-b border-brand-border flex flex-col items-center text-center">
+        <div className="bg-[#fbf9f7] pt-10 pb-8 px-5 border-b border-brand-border flex flex-col items-center text-center">
           <div className="w-64 h-64 mb-4 flex items-center justify-center">
             <Image
               src="/logo.png"
@@ -174,7 +174,7 @@ export default function MenuClient({
               <h2 className="text-[22px] font-black text-brand-text">قائمة الطعام</h2>
             </div>
             {categories.length === 0 ? (
-              <div className="text-center py-12 bg-[#FFFDF9] rounded-2xl border border-brand-border shadow-sm">
+              <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
                 <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
                 <p className="text-brand-brown font-medium">لا يوجد أقسام متاحة حالياً</p>
               </div>
@@ -184,7 +184,7 @@ export default function MenuClient({
                   <div
                     key={cat.id}
                     onClick={() => openCategory(cat.id)}
-                    className="bg-[#FFFDF9] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border active:scale-95 transition-all duration-200 cursor-pointer flex flex-col"
+                    className="bg-[#fbf9f7] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border active:scale-95 transition-all duration-200 cursor-pointer flex flex-col"
                     style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}
                   >
                     <div className="aspect-square relative w-full bg-brand-cream overflow-hidden border-b border-brand-border/50">
@@ -218,11 +218,11 @@ export default function MenuClient({
         {activeCategoryView !== null && (
           <div className="flex flex-col">
             {/* Header with swipeable tabs and back button */}
-            <div className="sticky top-0 z-20 bg-[#FFFDF9]/95 backdrop-blur-md border-b border-brand-border shadow-sm pt-2 pb-2">
+            <div className="sticky top-0 z-20 bg-[#fbf9f7]/95 backdrop-blur-md border-b border-brand-border shadow-sm pt-2 pb-2">
               <div className="flex items-center px-4 gap-3">
                 <button
                   onClick={() => setActiveCategoryView(null)}
-                  className="w-10 h-10 shrink-0 bg-[#FFFDF9] shadow-sm border border-brand-border rounded-full flex items-center justify-center hover:bg-brand-beige active:scale-90 transition-all text-brand-burgundy"
+                  className="w-10 h-10 shrink-0 bg-[#fbf9f7] shadow-sm border border-brand-border rounded-full flex items-center justify-center hover:bg-brand-beige active:scale-90 transition-all text-brand-burgundy"
                   aria-label="العودة للأقسام"
                 >
                   <ChevronRight className="w-6 h-6" />
@@ -248,7 +248,7 @@ export default function MenuClient({
             {/* Product Grid */}
             <div className="px-5 py-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
               {items.filter(i => i.category_id === activeCategoryView).length === 0 ? (
-                <div className="text-center py-12 bg-[#FFFDF9] rounded-2xl border border-brand-border shadow-sm">
+                <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
                   <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
                   <p className="text-brand-brown font-medium">لا يوجد منتجات في هذا القسم</p>
                 </div>
@@ -258,7 +258,7 @@ export default function MenuClient({
                     <div
                       key={item.id}
                       onClick={() => openItem(item)}
-                      className="bg-[#FFFDF9] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border active:scale-95 transition-all duration-200 cursor-pointer flex flex-col group"
+                      className="bg-[#fbf9f7] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border active:scale-95 transition-all duration-200 cursor-pointer flex flex-col group"
                       style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}
                     >
                       {/* Product Image */}
@@ -317,7 +317,7 @@ export default function MenuClient({
                   </svg>
                   <span>السلة</span>
                 </div>
-                <div className="bg-white/20 px-3 py-1 rounded-full text-sm font-black">
+                <div className="bg-[#fbf9f7]/20 px-3 py-1 rounded-full text-sm font-black">
                   {cartTotal} {currency}
                 </div>
               </button>
@@ -331,7 +331,7 @@ export default function MenuClient({
             <div className="absolute inset-0" onClick={() => setSelectedItem(null)} />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-[500px] bg-[#FFFDF9] h-[92vh] sm:h-auto sm:max-h-[90vh] sm:rounded-2xl flex flex-col rounded-t-2xl overflow-hidden shadow-2xl transform transition-transform animate-in slide-in-from-bottom-full sm:fade-in duration-300">
+            <div className="relative w-full max-w-[500px] bg-[#fbf9f7] h-[92vh] sm:h-auto sm:max-h-[90vh] sm:rounded-2xl flex flex-col rounded-t-2xl overflow-hidden shadow-2xl transform transition-transform animate-in slide-in-from-bottom-full sm:fade-in duration-300">
               {/* Modal Image Header */}
               <div className="relative shrink-0 w-full aspect-square bg-brand-cream border-b border-brand-border/50">
                 {selectedItem.image_url ? (
@@ -345,7 +345,7 @@ export default function MenuClient({
                 {/* Floating Close Button */}
                 <button
                   onClick={() => setSelectedItem(null)}
-                  className="absolute top-4 left-4 bg-white/90 backdrop-blur-md text-brand-text border border-brand-border w-10 h-10 rounded-full flex items-center justify-center shadow-sm active:scale-90 transition-all hover:bg-white"
+                  className="absolute top-4 left-4 bg-[#fbf9f7]/90 backdrop-blur-md text-brand-text border border-brand-border w-10 h-10 rounded-full flex items-center justify-center shadow-sm active:scale-90 transition-all hover:bg-[#fbf9f7]"
                   aria-label="إغلاق"
                 >
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -355,7 +355,7 @@ export default function MenuClient({
               </div>
 
               {/* Title & Description */}
-              <div className="p-5 bg-[#FFFDF9] shrink-0 rounded-b-2xl shadow-sm z-10 border-b border-brand-border/50">
+              <div className="p-5 bg-[#fbf9f7] shrink-0 rounded-b-2xl shadow-sm z-10 border-b border-brand-border/50">
                 <h2 className="text-2xl font-black text-brand-text leading-tight">{selectedItem.name}</h2>
                 {selectedItem.description && (
                   <p className="text-brand-brown mt-2 text-[14px] leading-relaxed">{selectedItem.description}</p>
@@ -365,7 +365,7 @@ export default function MenuClient({
               {/* Options Scrollable Area */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {selectedItem.groups.map(group => (
-                  <div key={group.id} className="bg-white rounded-2xl p-4 shadow-sm border border-brand-border">
+                  <div key={group.id} className="bg-[#fbf9f7] rounded-2xl p-4 shadow-sm border border-brand-border">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="font-bold text-brand-text">{group.title}</h3>
                       {group.is_required && (
@@ -384,12 +384,12 @@ export default function MenuClient({
                             key={opt.id}
                             className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all active:scale-[0.99] ${isSelected
                               ? 'border-brand-burgundy bg-brand-burgundy/5'
-                              : 'border-brand-border bg-white hover:border-brand-gold/30'
+                              : 'border-brand-border bg-[#fbf9f7] hover:border-brand-gold/30'
                               }`}
                           >
                             <div className="flex items-center gap-3">
                               <div className={`flex items-center justify-center w-5 h-5 border-2 transition-colors ${isSingle ? 'rounded-full' : 'rounded-md'
-                                } ${isSelected ? 'border-brand-burgundy bg-brand-burgundy' : 'border-brand-border bg-white'
+                                } ${isSelected ? 'border-brand-burgundy bg-brand-burgundy' : 'border-brand-border bg-[#fbf9f7]'
                                 }`}>
                                 {isSelected && (
                                   <svg width="10" height="10" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
@@ -415,7 +415,7 @@ export default function MenuClient({
               </div>
 
               {/* Bottom Action Bar */}
-              <div className="p-5 bg-white border-t border-brand-border/50 shrink-0">
+              <div className="p-5 bg-[#fbf9f7] border-t border-brand-border/50 shrink-0">
                 <div className="flex justify-between items-center mb-4 px-1">
                   <span className="text-brand-brown font-medium text-sm">المجموع</span>
                   <span className="text-2xl font-black text-brand-text">
@@ -439,10 +439,10 @@ export default function MenuClient({
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
             <div className="absolute inset-0" onClick={() => setIsCartOpen(false)} />
 
-            <div className="relative w-full max-w-[500px] bg-[#FFFDF9] h-[90vh] sm:h-auto sm:max-h-[90vh] sm:rounded-2xl flex flex-col rounded-t-2xl overflow-hidden shadow-2xl transform transition-transform animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
+            <div className="relative w-full max-w-[500px] bg-[#fbf9f7] h-[90vh] sm:h-auto sm:max-h-[90vh] sm:rounded-2xl flex flex-col rounded-t-2xl overflow-hidden shadow-2xl transform transition-transform animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
 
               {/* Header */}
-              <div className="p-5 bg-[#FFFDF9] border-b border-brand-border/50 shrink-0 flex justify-between items-center z-10 rounded-t-2xl">
+              <div className="p-5 bg-[#fbf9f7] border-b border-brand-border/50 shrink-0 flex justify-between items-center z-10 rounded-t-2xl">
                 <h2 className="text-xl font-black text-brand-text">سلة الطلبات</h2>
                 <button
                   onClick={() => setIsCartOpen(false)}
@@ -467,11 +467,11 @@ export default function MenuClient({
                   cart.map((cartItem) => (
                     <div key={cartItem.id} className="bg-brand-cream rounded-2xl p-4 shadow-sm border border-brand-border/50 flex gap-4">
                       {cartItem.item.image_url ? (
-                        <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-white border border-brand-border/30">
+                        <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-[#fbf9f7] border border-brand-border/30">
                           <Image src={cartItem.item.image_url} alt={cartItem.item.name} fill className="object-cover" />
                         </div>
                       ) : (
-                        <div className="w-16 h-16 rounded-xl bg-white flex items-center justify-center shrink-0 border border-brand-border/30">
+                        <div className="w-16 h-16 rounded-xl bg-[#fbf9f7] flex items-center justify-center shrink-0 border border-brand-border/30">
                           <ImageIcon className="w-6 h-6 text-brand-beige" />
                         </div>
                       )}
@@ -506,7 +506,7 @@ export default function MenuClient({
               </div>
 
               {/* Bottom Action Bar */}
-              <div className="p-5 bg-[#FFFDF9] border-t border-brand-border/50 shrink-0 sm:rounded-b-2xl">
+              <div className="p-5 bg-[#fbf9f7] border-t border-brand-border/50 shrink-0 sm:rounded-b-2xl">
                 <div className="flex justify-between items-end mb-4 px-1">
                   <span className="text-brand-brown font-medium text-sm">الإجمالي</span>
                   <span className="text-2xl font-black text-brand-gold">

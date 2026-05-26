@@ -23,7 +23,7 @@ export default function RootLayout({
       dir="rtl"
       className={`${cairo.variable} font-sans h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-gray-50 text-gray-900">{children}</body>
+      <body className="min-h-full flex flex-col bg-[#fbf9f7] text-gray-900">{children}</body>
     </html>
   );
 }
