@@ -5,7 +5,7 @@ It uses Next.js App Router, Tailwind CSS, and Supabase.
 
 ## Architecture
 - `src/app`: Next.js App Router.
-- `src/app/admin`: Admin dashboard, protected by Supabase Auth (via `src/middleware.ts`).
+- `src/app/asalaadmin26`: Admin dashboard, protected by Supabase Auth (via `src/middleware.ts` / `src/proxy.ts`).
 - `src/lib/supabase`: Supabase clients for server and browser.
 - `src/types/supabase.ts`: Database types generated from the schema.
 - `supabase/sql/schema.sql`: Contains the database schema and RLS policies.

@@ -54,14 +54,19 @@ export default async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone()
 
   if (url.pathname.startsWith('/admin')) {
-    if (url.pathname === '/admin/login') {
+    url.pathname = '/'
+    return NextResponse.redirect(url)
+  }
+
+  if (url.pathname.startsWith('/asalaadmin26')) {
+    if (url.pathname === '/asalaadmin26/login') {
       if (user) {
-        url.pathname = '/admin'
+        url.pathname = '/asalaadmin26'
         return NextResponse.redirect(url)
       }
     } else {
       if (!user) {
-        url.pathname = '/admin/login'
+        url.pathname = '/asalaadmin26/login'
         return NextResponse.redirect(url)
       }
     }

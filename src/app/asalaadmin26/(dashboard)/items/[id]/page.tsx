@@ -80,7 +80,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
     if (isNew) {
       const { data, error } = await supabase.from('menu_items').insert(payload as never).select().single()
       if (data) {
-        router.push(`/admin/items/${data.id}`)
+        router.push(`/asalaadmin26/items/${data.id}`)
       }
     } else {
       await supabase.from('menu_items').update(payload as never).eq('id', id)
@@ -145,7 +145,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
     <div className="space-y-6 max-w-4xl">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">{isNew ? 'إضافة منتج' : 'تعديل المنتج'}</h1>
-        <button onClick={() => router.push('/admin/items')} className="text-gray-600 hover:text-gray-900">العودة للمنتجات</button>
+        <button onClick={() => router.push('/asalaadmin26/items')} className="text-gray-600 hover:text-gray-900">العودة للمنتجات</button>
       </div>
 
       <form onSubmit={saveItem} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 space-y-4">

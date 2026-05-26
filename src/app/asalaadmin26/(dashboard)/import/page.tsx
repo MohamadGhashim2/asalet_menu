@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { importMenuData } from '@/app/admin/actions/import'
+import { importMenuData } from '@/app/asalaadmin26/actions/import'
 
 export default function ImportPage() {
   const [loading, setLoading] = useState(false)

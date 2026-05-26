@@ -66,7 +66,7 @@ export default function ItemsPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">المنتجات</h1>
         <Link
-          href="/admin/items/new"
+          href="/asalaadmin26/items/new"
           className="bg-brand-burgundy text-white px-4 py-2 rounded-lg hover:bg-brand-burgundy-dark flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
@@ -116,7 +116,7 @@ export default function ItemsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-4">
-                          <Link href={`/admin/items/${item.id}`} className="text-brand-burgundy hover:text-brand-burgundy-dark transition-colors">
+                          <Link href={`/asalaadmin26/items/${item.id}`} className="text-brand-burgundy hover:text-brand-burgundy-dark transition-colors">
                             <Edit2 className="w-4 h-4" />
                           </Link>
                           <button onClick={() => handleDelete(item.id)} className="text-red-500 hover:text-red-700 transition-colors">
