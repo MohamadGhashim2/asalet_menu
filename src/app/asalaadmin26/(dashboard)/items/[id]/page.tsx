@@ -38,6 +38,17 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
   const [basePriceInput, setBasePriceInput] = useState<string>('0')
 
   const [groups, setGroups] = useState<(OptionGroup & { options: Option[] })[]>([])
+  
+  // Template Linking State
+  const [availableTemplates, setAvailableTemplates] = useState<Database['public']['Tables']['option_group_templates']['Row'][]>([])
+  const [linkedTemplates, setLinkedTemplates] = useState<(Database['public']['Tables']['item_option_template_links']['Row'] & { option_group_templates: Database['public']['Tables']['option_group_templates']['Row'] })[]>([])
+  const [selectedTemplateToLink, setSelectedTemplateToLink] = useState('')
+
+  const [templateStates, setTemplateStates] = useState<Record<string, {
+    checked: boolean,
+    template_name: string,
+    display_title: string
+  }>>({})
 
   async function fetchData() {
     const { data: cats } = await supabase.from('categories').select('*')
@@ -49,6 +60,10 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
         setItem(prev => ({ ...prev, category_id: sortedCats[0].id }))
       }
     }
+    
+    // Fetch active templates for dropdown
+    const { data: templates } = await supabase.from('option_group_templates').select('*').eq('is_active', true).order('created_at', { ascending: false })
+    if (templates) setAvailableTemplates(templates)
 
     if (id !== 'new') {
       const { data } = await supabase.from('menu_items').select('*').eq('id', id).single()
@@ -59,6 +74,14 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
         if (groupsData) {
           setGroups(groupsData as never[])
         }
+        
+        // Fetch linked templates for this item
+        const { data: links } = await supabase
+          .from('item_option_template_links')
+          .select('*, option_group_templates(*)')
+          .eq('item_id', id)
+          .order('created_at')
+        if (links) setLinkedTemplates(links as never[])
       }
     }
     setLoading(false)
@@ -139,6 +162,104 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
     } : g))
   }
 
+  async function linkTemplate() {
+    if (!selectedTemplateToLink) return
+    const { data, error } = await supabase.from('item_option_template_links').insert({
+      item_id: id,
+      template_id: selectedTemplateToLink,
+    }).select('*, option_group_templates(*)').single()
+
+    if (error) {
+      if (error.code === '23505') alert('هذا القالب مرتبط بهذا الطبق مسبقاً')
+      else alert('حدث خطأ أثناء الربط')
+      return
+    }
+
+    if (data) {
+      setLinkedTemplates([...linkedTemplates, data as never])
+      setSelectedTemplateToLink('')
+    }
+  }
+
+  async function unlinkTemplate(linkId: string) {
+    if (!confirm('تأكيد إلغاء الربط؟ لن يتم حذف القالب الأساسي، بل سيتم فصله عن هذا المنتج فقط.')) return
+    await supabase.from('item_option_template_links').delete().eq('id', linkId)
+    setLinkedTemplates(linkedTemplates.filter(l => l.id !== linkId))
+  }
+
+  async function convertToTemplate(group: OptionGroup & { options: Option[] }) {
+    const tState = templateStates[group.id];
+    if (!tState || !tState.template_name.trim() || !tState.display_title.trim()) {
+      return alert('يرجى إدخال اسم القالب والعنوان الظاهر');
+    }
+    if (group.options.length === 0) {
+      return alert('يجب إضافة خيار واحد على الأقل للقالب');
+    }
+
+    // Check duplicate
+    const { data: existing } = await supabase
+      .from('option_group_templates')
+      .select('id')
+      .eq('template_name', tState.template_name.trim())
+      .maybeSingle();
+
+    if (existing) {
+      return alert('يوجد قالب بهذا الاسم مسبقاً، اختر اسماً آخر أو اربط القالب الموجود.');
+    }
+
+    // Insert template
+    const { data: newTemplate, error: tErr } = await supabase
+      .from('option_group_templates')
+      .insert({
+        template_name: tState.template_name.trim(),
+        display_title: tState.display_title.trim(),
+        kind: group.kind,
+        selection_type: group.selection_type,
+        is_required: group.is_required,
+        min_select: group.min_select,
+        max_select: group.max_select,
+        sort_order: group.sort_order,
+        is_active: true
+      }).select().single();
+
+    if (tErr || !newTemplate) {
+      return alert('حدث خطأ أثناء إنشاء القالب');
+    }
+
+    // Insert options
+    if (group.options.length > 0) {
+      const optionsToInsert = group.options.map(opt => ({
+        template_id: newTemplate.id,
+        name: opt.name,
+        price: opt.price,
+        is_default: opt.is_default,
+        sort_order: opt.sort_order,
+        is_active: opt.is_active
+      }));
+      await supabase.from('option_template_options').insert(optionsToInsert);
+    }
+
+    // Link to current item
+    const { data: newLink } = await supabase
+      .from('item_option_template_links')
+      .insert({
+        item_id: id,
+        template_id: newTemplate.id
+      }).select('*, option_group_templates(*)').single();
+
+    // Delete old group
+    await supabase.from('item_option_groups').delete().eq('id', group.id);
+
+    // Update UI State
+    setGroups(prev => prev.filter(g => g.id !== group.id));
+    if (newLink) {
+      setLinkedTemplates(prev => [...prev, newLink as never]);
+      setAvailableTemplates(prev => [newTemplate, ...prev]);
+    }
+    
+    alert('تم تحويل المجموعة إلى قالب وربطها بنجاح');
+  }
+
   if (loading) return <div>جاري التحميل...</div>
 
   return (
@@ -212,50 +333,188 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
           </div>
         ) : (
           groups.map(group => (
-            <div key={group.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <div className="flex gap-4 mb-4 items-end">
+            <div key={group.id} className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm mb-6 last:mb-0">
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
+                <h3 className="font-bold text-gray-800">مجموعة خيارات</h3>
+                <button onClick={() => deleteGroup(group.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg flex items-center justify-center transition-colors">
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 mb-5">
                 <div className="flex-1">
-                  <label className="block text-xs font-medium text-gray-500 mb-1">عنوان المجموعة</label>
-                  <input type="text" className="w-full px-2 py-1 border rounded" value={group.title} onChange={e => updateGroup(group.id, { title: e.target.value })} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">عنوان المجموعة</label>
+                  <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy" value={group.title} onChange={e => updateGroup(group.id, { title: e.target.value })} />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">النوع</label>
-                  <select className="w-full px-2 py-1 border rounded" value={group.kind || 'variant'} onChange={e => updateGroup(group.id, { kind: e.target.value as never })}>
+                <div className="w-full sm:w-40">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">النوع</label>
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy bg-white" value={group.kind || 'variant'} onChange={e => updateGroup(group.id, { kind: e.target.value as never })}>
                     <option value="variant">نوع (Variant)</option>
                     <option value="addon">إضافة (Addon)</option>
                     <option value="modifier">تعديل (Modifier)</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">طبيعة الاختيار</label>
-                  <select className="w-full px-2 py-1 border rounded" value={group.selection_type || 'single'} onChange={e => updateGroup(group.id, { selection_type: e.target.value as never })}>
+                <div className="w-full sm:w-40">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">طبيعة الاختيار</label>
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy bg-white" value={group.selection_type || 'single'} onChange={e => updateGroup(group.id, { selection_type: e.target.value as never })}>
                     <option value="single">اختيار واحد</option>
                     <option value="multiple">متعدد</option>
                   </select>
                 </div>
-                <div className="flex items-center gap-2 mb-1">
-                  <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={group.is_required || false} onChange={e => updateGroup(group.id, { is_required: e.target.checked })} /> إجباري</label>
-                </div>
-                <button onClick={() => deleteGroup(group.id)} className="text-red-600 hover:text-red-900 mb-1"><Trash2 className="w-5 h-5" /></button>
               </div>
 
-              <div className="pl-4 border-r-2 border-gray-300 mr-4 pr-4">
-                <h4 className="text-sm font-semibold mb-2">الخيارات:</h4>
-                <div className="space-y-2">
+              <div className="mb-6">
+                <label className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors w-full sm:w-fit">
+                  <input type="checkbox" className="w-5 h-5 text-brand-burgundy rounded focus:ring-brand-burgundy border-gray-300" checked={group.is_required || false} onChange={e => updateGroup(group.id, { is_required: e.target.checked })} /> 
+                  <span className="text-sm font-medium text-gray-700">إجباري (يجب اختيار خيار واحد على الأقل)</span>
+                </label>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <h4 className="text-sm font-bold text-gray-800 mb-3">الخيارات:</h4>
+                <div className="space-y-3">
                   {group.options.map(opt => (
-                    <div key={opt.id} className="flex gap-2 items-center bg-white p-2 rounded border">
-                      <input type="text" className="flex-1 px-2 py-1 border rounded text-sm" value={opt.name} onChange={e => updateOption(group.id, opt.id, { name: e.target.value })} placeholder="الاسم (مثال: حجم كبير)" />
-                      <input type="number" className="w-32 px-2 py-1 border rounded text-sm" value={opt.price || 0} onChange={e => updateOption(group.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder="السعر الإضافي" />
-                      <button onClick={() => deleteOption(group.id, opt.id)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
+                    <div key={opt.id} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                      <div className="w-full flex-1">
+                        <label className="block text-xs font-medium text-gray-500 mb-1 sm:hidden">الاسم</label>
+                        <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.name} onChange={e => updateOption(group.id, opt.id, { name: e.target.value })} placeholder="الاسم (مثال: حجم كبير)" />
+                      </div>
+                      <div className="w-full sm:w-32 shrink-0">
+                        <label className="block text-xs font-medium text-gray-500 mb-1 sm:hidden">السعر الإضافي</label>
+                        <input type="number" step="0.01" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.price || 0} onChange={e => updateOption(group.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder="السعر الإضافي" />
+                      </div>
+                      <div className="w-full sm:w-auto flex justify-end shrink-0">
+                        <button onClick={() => deleteOption(group.id, opt.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg flex items-center justify-center transition-colors w-full sm:w-auto mt-1 sm:mt-0 border border-red-100 sm:border-none bg-red-50 sm:bg-transparent">
+                          <Trash2 className="w-4 h-4 sm:mr-0 mr-2" />
+                          <span className="text-sm sm:hidden font-medium">حذف الخيار</span>
+                        </button>
+                      </div>
                     </div>
                   ))}
-                  <button onClick={() => addOption(group.id)} className="text-sm text-brand-burgundy hover:text-brand-burgundy-dark flex items-center gap-1 mt-2">
-                    <Plus className="w-3 h-3" /> إضافة خيار
+                  <button onClick={() => addOption(group.id)} className="w-full sm:w-auto mt-2 px-4 py-3 sm:py-2 bg-brand-burgundy/10 text-brand-burgundy hover:bg-brand-burgundy/20 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors text-sm">
+                    <Plus className="w-4 h-4" /> إضافة خيار
                   </button>
                 </div>
               </div>
+              
+              {/* Convert to Template Section */}
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <label className="flex items-center gap-2 cursor-pointer mb-3 w-fit">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-brand-burgundy rounded focus:ring-brand-burgundy border-gray-300"
+                    checked={templateStates[group.id]?.checked || false}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setTemplateStates(prev => ({
+                        ...prev,
+                        [group.id]: {
+                          checked,
+                          template_name: prev[group.id]?.template_name || group.title,
+                          display_title: prev[group.id]?.display_title || group.title
+                        }
+                      }));
+                    }}
+                  />
+                  <span className="text-sm font-bold text-brand-burgundy">حفظ هذه المجموعة كقالب (اختياري)</span>
+                </label>
+                
+                {templateStates[group.id]?.checked && (
+                  <div className="bg-brand-cream/50 p-4 rounded-lg border border-brand-burgundy/20 space-y-4">
+                    <p className="text-xs text-brand-brown">اسم القالب يظهر داخل لوحة الإدارة فقط، أما العنوان الظاهر فهو الذي يراه الزبون داخل المنيو.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">اسم القالب داخل الإدارة</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy bg-white"
+                          value={templateStates[group.id].template_name}
+                          onChange={e => setTemplateStates(prev => ({...prev, [group.id]: {...prev[group.id], template_name: e.target.value}}))}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">العنوان الظاهر للزبون</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy bg-white"
+                          value={templateStates[group.id].display_title}
+                          onChange={e => setTemplateStates(prev => ({...prev, [group.id]: {...prev[group.id], display_title: e.target.value}}))}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <button 
+                        onClick={() => convertToTemplate(group)}
+                        className="bg-brand-burgundy text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-burgundy-dark transition-colors shadow-sm"
+                      >
+                        تأكيد وحفظ كقالب
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
           ))
+        )}
+      </div>
+
+      <div className="space-y-4 mt-12 border-t pt-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-gray-900">القوالب المرتبطة (Linked Templates)</h2>
+        </div>
+
+        {isNew ? (
+          <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-500">
+            يرجى حفظ المنتج أولاً لتتمكن من ربط القوالب
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="bg-blue-50 p-4 sm:p-5 rounded-xl border border-blue-100 flex flex-col sm:flex-row gap-4 items-end">
+              <div className="w-full flex-1">
+                <label className="block text-sm font-medium text-blue-900 mb-1">اختر قالباً لربطه بهذا المنتج</label>
+                <select 
+                  className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  value={selectedTemplateToLink}
+                  onChange={e => setSelectedTemplateToLink(e.target.value)}
+                >
+                  <option value="">-- اختر قالب --</option>
+                  {availableTemplates.map(t => (
+                    <option key={t.id} value={t.id}>{t.template_name} (يظهر للزبون: {t.display_title})</option>
+                  ))}
+                </select>
+              </div>
+              <button 
+                type="button" 
+                onClick={linkTemplate}
+                disabled={!selectedTemplateToLink}
+                className="bg-blue-600 text-white w-full sm:w-auto px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium h-[42px] flex items-center justify-center"
+              >
+                ربط القالب
+              </button>
+            </div>
+
+            {linkedTemplates.length === 0 ? (
+              <div className="text-gray-500 text-sm text-center py-4 bg-gray-50 rounded-lg border border-gray-100">لا توجد قوالب مرتبطة حالياً بهذا المنتج.</div>
+            ) : (
+              <div className="grid gap-4">
+                {linkedTemplates.map(link => (
+                  <div key={link.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <h3 className="font-bold text-gray-800">{link.option_group_templates.template_name}</h3>
+                      <p className="text-sm text-gray-500 mt-1">النوع: {link.option_group_templates.kind} | يظهر للزبون كـ: {link.option_group_templates.display_title}</p>
+                    </div>
+                    <button 
+                      onClick={() => unlinkTemplate(link.id)} 
+                      className="text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm font-medium border border-red-100 w-full sm:w-auto"
+                    >
+                      <Trash2 className="w-4 h-4" /> فك الارتباط
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -13,5 +13,5 @@ It uses Next.js App Router, Tailwind CSS, and Supabase.
 ## Key Decisions
 - No complex multi-tenant SaaS logic.
 - Single client setup.
-- Image URLs are mostly static strings pointing to `/menu-assets/` for now, or Supabase Storage bucket `menu-images`.
+- Image URLs point to the Supabase Storage bucket `menu-images`. Local static assets and import features have been removed.
 - RTL/Arabic UI.

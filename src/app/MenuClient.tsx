@@ -4,11 +4,22 @@ import { useState, useEffect } from 'react'
 import { Database } from '@/types/supabase'
 import { ChevronRight, Info, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
+import PublicFooter from '@/components/public/PublicFooter'
+
+const isSupabaseOrLocal = (url: string) => url.startsWith('/') || url.includes('supabase.co');
+
+const SafeImage = ({ src, alt, className }: { src: string, alt: string, className?: string }) => {
+  if (isSupabaseOrLocal(src)) {
+    return <Image src={src} alt={alt} fill className={className} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} className={`w-full h-full ${className || ''}`} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+};
 
 type Settings = Database['public']['Tables']['restaurant_settings']['Row']
 type Category = Database['public']['Tables']['categories']['Row']
 type Option = Database['public']['Tables']['item_options']['Row']
-type OptionGroup = Database['public']['Tables']['item_option_groups']['Row'] & { options: Option[] }
+type OptionGroup = Database['public']['Tables']['item_option_groups']['Row'] & { options: Option[], source?: 'item' | 'template' }
 type MenuItem = Database['public']['Tables']['menu_items']['Row'] & { groups: OptionGroup[] }
 
 type CartItem = {
@@ -36,6 +47,22 @@ export default function MenuClient({
   const [isCartOpen, setIsCartOpen] = useState(false)
 
   const currency = settings?.currency || 'ر.س'
+
+  // Client-side sort fallback for items (sort_order then created_at)
+  const sortedItems = [...items].sort((a, b) => {
+    const sortA = a.sort_order ?? 0;
+    const sortB = b.sort_order ?? 0;
+    if (sortA !== sortB) return sortA - sortB;
+    return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime();
+  });
+
+  const getValidImageUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    if (url.startsWith('/menu-assets/')) return null;
+    return url;
+  };
+
+
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -105,7 +132,7 @@ export default function MenuClient({
   const total = calculateTotal()
 
   const addToCart = () => {
-    if (!selectedItem || total === null) return
+    if (!selectedItem || total === null || validationError) return
 
     setCart(prev => [...prev, {
       id: Math.random().toString(36).substring(7),
@@ -121,28 +148,67 @@ export default function MenuClient({
     setCart(prev => prev.filter(c => c.id !== cartItemId))
   }
 
+  const updateQuantity = (cartItemId: string, delta: number) => {
+    setCart(prev => prev.map(c => {
+      if (c.id === cartItemId) {
+        const newQuantity = Math.max(1, c.quantity + delta);
+        return { ...c, quantity: newQuantity };
+      }
+      return c;
+    }));
+  }
+
+  const clearCart = () => {
+    setCart([]);
+  }
+
+  const validateSelection = (): string | null => {
+    if (!selectedItem) return null;
+    for (const group of selectedItem.groups) {
+      const selected = selections[group.id] || [];
+      if (group.is_required && group.selection_type === 'single' && selected.length === 0) {
+        return `يرجى اختيار خيار واحد على الأقل من ${group.title}`;
+      }
+      if (group.is_required && group.selection_type === 'multiple' && group.min_select !== null && selected.length < group.min_select) {
+        return `يرجى اختيار ${group.min_select} خيارات على الأقل من ${group.title}`;
+      }
+      if (group.selection_type === 'multiple' && group.max_select !== null && selected.length > group.max_select) {
+        return `لا يمكنك اختيار أكثر من ${group.max_select} خيارات من ${group.title}`;
+      }
+    }
+    return null;
+  }
+
+  const validationError = validateSelection();
+
   const cartTotal = cart.reduce((sum, current) => sum + current.total * current.quantity, 0)
 
   const generateWhatsAppMessage = () => {
-    let msg = `*طلب جديد من القائمة* 🛒\n\n`
+    let msg = `*طلب جديد من منيو أصالة:* 🛒\n\n`
 
-    cart.forEach(cartItem => {
-      msg += `▪️ *${cartItem.item.name}* (x${cartItem.quantity})\n`
+    cart.forEach((cartItem, index) => {
+      msg += `${index + 1}) *${cartItem.item.name}*\n`
+      msg += `الكمية: ${cartItem.quantity}\n`
 
       // Add selections
       cartItem.item.groups.forEach(group => {
         const selectedOptionIds = cartItem.selections[group.id] || []
         const selectedOptions = group.options.filter(o => selectedOptionIds.includes(o.id))
         if (selectedOptions.length > 0) {
-          msg += `   - ${group.title}: ${selectedOptions.map(o => o.name).join('، ')}\n`
+          msg += `${group.title}:\n`
+          selectedOptions.forEach(o => {
+            if ((o.price || 0) > 0) {
+              msg += `- ${o.name} +${o.price} ${currency}\n`
+            } else {
+              msg += `- ${o.name}\n`
+            }
+          })
         }
       })
-      msg += `   السعر: ${cartItem.total} ${currency}\n\n`
+      msg += `السعر الفرعي: ${cartItem.total} ${currency}\n\n`
     })
 
-    msg += `-------------------\n`
-    msg += `*الإجمالي:* ${cartTotal} ${currency}`
-
+    msg += `*الإجمالي: ${cartTotal} ${currency}*`
     return encodeURIComponent(msg)
   }
 
@@ -151,25 +217,68 @@ export default function MenuClient({
       <div className="w-full max-w-6xl bg-[#fbf9f7] min-h-screen shadow-2xl relative pb-28 flex flex-col md:border-x md:border-brand-border">
 
         {/* Compact Restaurant Header */}
-        <div className="bg-[#fbf9f7] pt-10 pb-8 px-5 border-b border-brand-border flex flex-col items-center text-center">
-          <div className="w-64 h-64 mb-4 flex items-center justify-center">
+        <div className="bg-[#fbf9f7] pt-6 pb-4 px-5 flex flex-col items-center text-center border-b border-brand-border/50">
+          <div className="w-32 h-32 sm:w-40 sm:h-40 relative flex items-center justify-center">
             <Image
               src="/logo.png"
               alt="Asalet Mandi Logo"
-              width={192}
-              height={192}
+              fill
               className="object-contain drop-shadow-sm"
               priority
             />
           </div>
-          <h1 className="text-[28px] md:text-[32px] font-black mb-1.5 tracking-tight text-brand-burgundy"></h1>
-          <p className="text-brand-brown text-[15px] md:text-[16px] font-medium">
-          </p>
         </div>
+
+        {/* Featured Products */}
+        {activeCategoryView === null && sortedItems.filter(i => i.is_featured).length > 0 && (
+          <div className="pt-8 pb-2 overflow-hidden">
+            <h2 className="text-[20px] font-black text-brand-text mb-4 px-5">المنتجات المميزة</h2>
+            {(() => {
+              const baseFeatured = sortedItems.filter(i => i.is_featured)
+              // Ensure we have enough items to fill the screen twice (for seamless 50% translation)
+              // Multiply base items so we have at least 10 items total, and ensure it's an even multiplier
+              const repeats = Math.max(4, Math.ceil(12 / Math.max(1, baseFeatured.length)))
+              const evenRepeats = repeats % 2 === 0 ? repeats : repeats + 1
+              const marqueeItems = Array(evenRepeats).fill(baseFeatured).flat()
+
+              return (
+                <div className="overflow-x-auto hide-scrollbar pb-4 px-5">
+                  <div className="flex gap-4 pl-4 w-max animate-marquee">
+                    {marqueeItems.map((item, index) => (
+                      <div 
+                        key={`${item.id}-${index}`}
+                        onClick={() => openItem(item)}
+                        className="shrink-0 w-[160px] sm:w-[200px] bg-[#fbf9f7] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border cursor-pointer flex flex-col active:scale-95 transition-all duration-200"
+                      >
+                        <div className="aspect-square relative w-full bg-brand-cream border-b border-brand-border/50">
+                          {getValidImageUrl(item.image_url) ? (
+                            <SafeImage src={getValidImageUrl(item.image_url)!} alt={item.name} className="object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-brand-cream">
+                               <ImageIcon className="w-8 h-8 text-brand-beige" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-3 flex flex-col flex-1 bg-[#fbf9f7]">
+                          <h3 className="font-bold text-[14px] text-brand-text line-clamp-2 leading-tight mb-2">{item.name}</h3>
+                          <div className="mt-auto">
+                            <span className="text-brand-burgundy font-bold text-[14px]">
+                              {item.base_price !== null ? `${item.base_price} ${currency}` : 'اختر النوع'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
 
         {/* Categories View */}
         {activeCategoryView === null && (
-          <div className="px-5 py-8">
+          <div className="px-5 py-6">
             <div className="flex items-center mb-6">
               <h2 className="text-[22px] font-black text-brand-text">قائمة الطعام</h2>
             </div>
@@ -188,21 +297,20 @@ export default function MenuClient({
                     style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}
                   >
                     <div className="aspect-square relative w-full bg-brand-cream overflow-hidden border-b border-brand-border/50">
-                      {cat.image_url || items.find(i => i.category_id === cat.id && i.image_url)?.image_url ? (
-                        <Image
-                          src={cat.image_url || items.find(i => i.category_id === cat.id && i.image_url)?.image_url || ''}
-                          alt={cat.name}
-                          fill
-                          className="object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-brand-cream p-4 text-center">
-                          <span className="text-brand-brown font-bold text-[13px] leading-tight">{cat.name}</span>
-                        </div>
-                      )}
+                      {(() => {
+                        const validCatImg = getValidImageUrl(cat.image_url);
+                        const firstItemImg = !validCatImg ? getValidImageUrl(sortedItems.find(i => i.category_id === cat.id && getValidImageUrl(i.image_url))?.image_url) : null;
+                        const finalImg = validCatImg || firstItemImg;
+                        
+                        return finalImg ? (
+                          <SafeImage src={finalImg} alt={cat.name} className="object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-cream p-4 text-center">
+                            <ImageIcon className="w-8 h-8 text-brand-beige mb-2" />
+                            <span className="text-brand-brown font-bold text-[13px] leading-tight">{cat.name}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="p-3 text-center flex items-center justify-center min-h-[3rem]">
                       <h3 className="text-brand-burgundy font-bold text-[14px] leading-tight line-clamp-2">{cat.name}</h3>
@@ -247,14 +355,14 @@ export default function MenuClient({
 
             {/* Product Grid */}
             <div className="px-5 py-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              {items.filter(i => i.category_id === activeCategoryView).length === 0 ? (
+              {sortedItems.filter(i => i.category_id === activeCategoryView).length === 0 ? (
                 <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
                   <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
                   <p className="text-brand-brown font-medium">لا يوجد منتجات في هذا القسم</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  {items.filter(i => i.category_id === activeCategoryView).map((item, i) => (
+                  {sortedItems.filter(i => i.category_id === activeCategoryView).map((item, i) => (
                     <div
                       key={item.id}
                       onClick={() => openItem(item)}
@@ -263,13 +371,8 @@ export default function MenuClient({
                     >
                       {/* Product Image */}
                       <div className="aspect-square bg-brand-cream relative w-full overflow-hidden border-b border-brand-border/50">
-                        {item.image_url ? (
-                          <Image
-                            src={item.image_url}
-                            alt={item.name}
-                            fill
-                            className="object-cover"
-                          />
+                        {getValidImageUrl(item.image_url) ? (
+                          <SafeImage src={getValidImageUrl(item.image_url)!} alt={item.name} className="object-cover" />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <ImageIcon className="w-8 h-8 text-brand-beige" />
@@ -303,49 +406,63 @@ export default function MenuClient({
           </div>
         )}
 
-        {/* Floating Cart Button */}
-        {cart.length > 0 && !isCartOpen && (
-          <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none flex justify-center">
-            <div className="w-full max-w-[560px] relative">
-              <button
-                onClick={() => setIsCartOpen(true)}
-                className="absolute bottom-6 left-5 right-5 pointer-events-auto bg-brand-burgundy text-white p-4 rounded-2xl shadow-xl flex items-center justify-between hover:bg-brand-burgundy-dark transition-all animate-in slide-in-from-bottom-5"
-              >
-                <div className="flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                    <path d="M2.25 2.25a.75.75 0 000 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 00-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 000-1.5H5.378A2.25 2.25 0 017.5 15h11.218a.75.75 0 00.674-.421 60.358 60.358 0 002.96-7.228.75.75 0 00-.525-.965A60.864 60.864 0 005.68 4.509l-.232-.867A1.875 1.875 0 003.636 2.25H2.25zM3.75 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM16.5 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z" />
+        {/* Floating Cart UI */}
+        {!isCartOpen && (
+          <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none flex justify-center pb-safe">
+            <div className="w-full max-w-6xl relative h-0">
+              {cart.length > 0 ? (
+                <button
+                  onClick={() => setIsCartOpen(true)}
+                  className="absolute bottom-6 left-5 right-5 sm:left-auto sm:right-5 sm:w-[320px] pointer-events-auto bg-brand-burgundy text-white p-4 rounded-2xl shadow-xl flex items-center justify-between hover:bg-brand-burgundy-dark transition-all animate-in slide-in-from-bottom-5"
+                >
+                  <div className="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                      <path d="M2.25 2.25a.75.75 0 000 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 00-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 000-1.5H5.378A2.25 2.25 0 017.5 15h11.218a.75.75 0 00.674-.421 60.358 60.358 0 002.96-7.228.75.75 0 00-.525-.965A60.864 60.864 0 005.68 4.509l-.232-.867A1.875 1.875 0 003.636 2.25H2.25zM3.75 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM16.5 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z" />
+                    </svg>
+                    <span>السلة</span>
+                  </div>
+                  <div className="bg-[#fbf9f7]/20 px-3 py-1 rounded-full text-sm font-black">
+                    {cartTotal} {currency}
+                  </div>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsCartOpen(true)}
+                  className="absolute bottom-[90px] right-4 sm:right-6 pointer-events-auto bg-brand-cream border-2 border-brand-burgundy text-brand-burgundy w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:bg-brand-beige active:scale-90 transition-all animate-in fade-in zoom-in"
+                  aria-label="فتح السلة"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+                    <circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                   </svg>
-                  <span>السلة</span>
-                </div>
-                <div className="bg-[#fbf9f7]/20 px-3 py-1 rounded-full text-sm font-black">
-                  {cartTotal} {currency}
-                </div>
-              </button>
+                </button>
+              )}
             </div>
           </div>
         )}
 
         {/* Item Details Modal */}
         {selectedItem && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
             <div className="absolute inset-0" onClick={() => setSelectedItem(null)} />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-[500px] bg-[#fbf9f7] h-[92vh] sm:h-auto sm:max-h-[90vh] sm:rounded-2xl flex flex-col rounded-t-2xl overflow-hidden shadow-2xl transform transition-transform animate-in slide-in-from-bottom-full sm:fade-in duration-300">
+            <div className="relative w-full max-w-[500px] bg-[#fbf9f7] h-[92dvh] sm:h-auto sm:max-h-[90dvh] sm:rounded-2xl flex flex-col rounded-t-3xl overflow-hidden shadow-2xl transform transition-transform animate-in slide-in-from-bottom-full sm:fade-in duration-300">
               {/* Modal Image Header */}
-              <div className="relative shrink-0 w-full aspect-square bg-brand-cream border-b border-brand-border/50">
-                {selectedItem.image_url ? (
-                  <Image src={selectedItem.image_url} alt={selectedItem.name} fill className="object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-brand-cream flex items-center justify-center">
-                    <ImageIcon className="w-16 h-16 text-brand-beige" />
-                  </div>
-                )}
+              <div className="relative shrink-0 w-full bg-[#fbf9f7] pt-14 pb-4 px-6 border-b border-brand-border/50 flex flex-col items-center">
+                <div className="relative w-full max-w-[260px] sm:max-w-[300px] aspect-square bg-[#7A1524] rounded-2xl shadow-sm overflow-hidden">
+                  {getValidImageUrl(selectedItem.image_url) ? (
+                    <SafeImage src={getValidImageUrl(selectedItem.image_url)!} alt={selectedItem.name} className="object-contain" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="w-16 h-16 text-white/30" />
+                    </div>
+                  )}
+                </div>
 
                 {/* Floating Close Button */}
                 <button
                   onClick={() => setSelectedItem(null)}
-                  className="absolute top-4 left-4 bg-[#fbf9f7]/90 backdrop-blur-md text-brand-text border border-brand-border w-10 h-10 rounded-full flex items-center justify-center shadow-sm active:scale-90 transition-all hover:bg-[#fbf9f7]"
+                  className="absolute top-4 left-4 bg-white text-brand-text border border-gray-200 w-10 h-10 rounded-full flex items-center justify-center shadow-sm active:scale-90 transition-all hover:bg-gray-50 z-10"
                   aria-label="إغلاق"
                 >
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -355,7 +472,7 @@ export default function MenuClient({
               </div>
 
               {/* Title & Description */}
-              <div className="p-5 bg-[#fbf9f7] shrink-0 rounded-b-2xl shadow-sm z-10 border-b border-brand-border/50">
+              <div className="p-5 bg-[#fbf9f7] shrink-0 z-10 border-b border-brand-border/50">
                 <h2 className="text-2xl font-black text-brand-text leading-tight">{selectedItem.name}</h2>
                 {selectedItem.description && (
                   <p className="text-brand-brown mt-2 text-[14px] leading-relaxed">{selectedItem.description}</p>
@@ -363,7 +480,7 @@ export default function MenuClient({
               </div>
 
               {/* Options Scrollable Area */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 relative z-0">
                 {selectedItem.groups.map(group => (
                   <div key={group.id} className="bg-[#fbf9f7] rounded-2xl p-4 shadow-sm border border-brand-border">
                     <div className="flex justify-between items-center mb-3">
@@ -380,8 +497,10 @@ export default function MenuClient({
                         const isSelected = selections[group.id]?.includes(opt.id)
                         const isSingle = group.selection_type === 'single'
                         return (
-                          <label
+                          <div
                             key={opt.id}
+                            onClick={() => toggleSelection(group.id, opt.id, group.selection_type || 'single')}
+                            role="button"
                             className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all active:scale-[0.99] ${isSelected
                               ? 'border-brand-burgundy bg-brand-burgundy/5'
                               : 'border-brand-border bg-[#fbf9f7] hover:border-brand-gold/30'
@@ -406,7 +525,7 @@ export default function MenuClient({
                                 {group.kind === 'variant' ? '' : '+'}{opt.price} {currency}
                               </span>
                             )}
-                          </label>
+                          </div>
                         )
                       })}
                     </div>
@@ -415,16 +534,21 @@ export default function MenuClient({
               </div>
 
               {/* Bottom Action Bar */}
-              <div className="p-5 bg-[#fbf9f7] border-t border-brand-border/50 shrink-0">
+              <div className="p-4 sm:p-5 pb-8 sm:pb-5 bg-[#fbf9f7] border-t border-brand-border/50 shrink-0 sticky bottom-0 z-20 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)]">
                 <div className="flex justify-between items-center mb-4 px-1">
                   <span className="text-brand-brown font-medium text-sm">المجموع</span>
                   <span className="text-2xl font-black text-brand-text">
-                    {total !== null ? `${total} ${currency}` : <span className="text-[15px] text-brand-brown/50 font-normal">اختر الخيارات</span>}
+                    {total !== null ? `${total} ${currency}` : <span className="text-[15px] text-brand-brown/50 font-normal">اختر النوع</span>}
                   </span>
                 </div>
+                {validationError && (
+                  <div className="mb-3 text-brand-burgundy text-sm font-medium px-2 text-center bg-brand-burgundy/10 py-2 rounded-lg">
+                    {validationError}
+                  </div>
+                )}
                 <button
                   onClick={addToCart}
-                  disabled={total === null}
+                  disabled={total === null || validationError !== null}
                   className="w-full bg-brand-burgundy text-white py-4 rounded-2xl font-bold text-[17px] hover:bg-[#681010] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-burgundy/20"
                 >
                   إضافة للسلة
@@ -466,9 +590,9 @@ export default function MenuClient({
                 ) : (
                   cart.map((cartItem) => (
                     <div key={cartItem.id} className="bg-brand-cream rounded-2xl p-4 shadow-sm border border-brand-border/50 flex gap-4">
-                      {cartItem.item.image_url ? (
+                      {getValidImageUrl(cartItem.item.image_url) ? (
                         <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-[#fbf9f7] border border-brand-border/30">
-                          <Image src={cartItem.item.image_url} alt={cartItem.item.name} fill className="object-cover" />
+                          <SafeImage src={getValidImageUrl(cartItem.item.image_url)!} alt={cartItem.item.name} className="object-cover" />
                         </div>
                       ) : (
                         <div className="w-16 h-16 rounded-xl bg-[#fbf9f7] flex items-center justify-center shrink-0 border border-brand-border/30">
@@ -493,12 +617,19 @@ export default function MenuClient({
 
                             return (
                               <p key={group.id} className="text-[12px] text-brand-brown">
-                                <span className="font-medium text-brand-text">{group.title}:</span> {selectedOptions.map(o => o.name).join('، ')}
+                                <span className="font-medium text-brand-text">{group.title}:</span> {selectedOptions.map(o => (o.price || 0) > 0 ? `${o.name} (+${o.price} ${currency})` : o.name).join('، ')}
                               </p>
                             )
                           })}
                         </div>
-                        <p className="text-brand-burgundy font-black text-[14px] mt-auto">{cartItem.total} {currency}</p>
+                        <div className="flex items-center justify-between mt-auto pt-2 border-t border-brand-border/30">
+                          <p className="text-brand-burgundy font-black text-[14px]">{cartItem.total * cartItem.quantity} {currency}</p>
+                          <div className="flex items-center gap-3 bg-brand-cream border border-brand-border/80 rounded-lg px-2 py-0.5 shadow-sm">
+                            <button onClick={() => updateQuantity(cartItem.id, 1)} className="text-brand-burgundy font-bold text-lg leading-none active:scale-90">+</button>
+                            <span className="font-bold text-sm min-w-[2ch] text-center">{cartItem.quantity}</span>
+                            <button onClick={() => updateQuantity(cartItem.id, -1)} disabled={cartItem.quantity <= 1} className="text-brand-brown font-bold text-lg leading-none active:scale-90 disabled:opacity-30 disabled:active:scale-100">-</button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -508,7 +639,14 @@ export default function MenuClient({
               {/* Bottom Action Bar */}
               <div className="p-5 bg-[#fbf9f7] border-t border-brand-border/50 shrink-0 sm:rounded-b-2xl">
                 <div className="flex justify-between items-end mb-4 px-1">
-                  <span className="text-brand-brown font-medium text-sm">الإجمالي</span>
+                  <div className="flex flex-col">
+                    <span className="text-brand-brown font-medium text-sm mb-1">الإجمالي</span>
+                    {cart.length > 0 && (
+                      <button onClick={clearCart} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1 active:scale-95 transition-transform">
+                        تفريغ السلة
+                      </button>
+                    )}
+                  </div>
                   <span className="text-2xl font-black text-brand-gold">
                     {cartTotal} {currency}
                   </span>
@@ -522,12 +660,12 @@ export default function MenuClient({
                       e.preventDefault()
                     } else {
                       setIsCartOpen(false)
-                      setCart([])
+                      // Do not clear cart as per user request
                     }
                   }}
-                  className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-[17px] transition-all ${cart.length > 0
-                    ? 'bg-[#25D366] text-white hover:bg-[#20bd5a] shadow-md shadow-[#25D366]/20 active:scale-[0.98]'
-                    : 'bg-brand-cream text-brand-brown/50 cursor-not-allowed shadow-none'
+                  className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-[17px] transition-all bg-[#25D366] text-white ${cart.length > 0
+                    ? 'hover:bg-[#20bd5a] shadow-md shadow-[#25D366]/20 active:scale-[0.98]'
+                    : 'opacity-60 cursor-not-allowed shadow-none'
                     }`}
                 >
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -540,6 +678,8 @@ export default function MenuClient({
           </div>
         )}
 
+        <PublicFooter settings={settings} />
+
         <style jsx global>{`
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
@@ -551,6 +691,23 @@ export default function MenuClient({
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes marquee-rtl {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(50%); }
+        }
+        .animate-marquee {
+          animation: marquee-rtl 40s linear infinite;
+          will-change: transform;
+        }
+        .animate-marquee:hover,
+        .animate-marquee:active {
+          animation-play-state: paused;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-marquee {
+            animation: none !important;
+          }
         }
         body {
           background-color: #F7F1E8;

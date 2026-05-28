@@ -19,18 +19,65 @@ export default function ImageUploader({ value, onChange, folder = 'items', helpe
   
   const supabase = createClient()
 
-  const handleUpload = async (file: File) => {
+  const compressImage = async (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const size = 500;
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(file);
+            return;
+          }
+          
+          // Fill background with brand cream color
+          ctx.fillStyle = '#fbf9f7';
+          ctx.fillRect(0, 0, size, size);
+
+          // Calculate aspect ratio to contain
+          const scale = Math.min(size / img.width, size / img.height);
+          const x = (size - img.width * scale) / 2;
+          const y = (size - img.height * scale) / 2;
+          
+          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+          
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const newName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+              resolve(new File([blob], newName, { type: 'image/webp' }));
+            } else {
+              resolve(file);
+            }
+          }, 'image/webp', 0.8);
+        };
+        img.onerror = () => reject(new Error('فشل تحميل الصورة'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('فشل قراءة الملف'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleUpload = async (rawFile: File) => {
     try {
       setError(null)
       setIsUploading(true)
 
       // Validation
-      if (!file.type.startsWith('image/')) {
+      if (!rawFile.type.startsWith('image/')) {
         throw new Error('الرجاء رفع ملف صورة صالح')
       }
-      if (file.size > 5 * 1024 * 1024) {
+      if (rawFile.size > 5 * 1024 * 1024) {
         throw new Error('حجم الصورة يجب أن لا يتجاوز 5 ميجابايت')
       }
+
+      // Compress
+      const file = await compressImage(rawFile);
 
       // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop()
@@ -123,7 +170,8 @@ export default function ImageUploader({ value, onChange, folder = 'items', helpe
               <UploadCloud className="w-8 h-8 mb-2 text-gray-400" />
               <span className="text-sm font-bold mb-1 text-gray-700">اضغط هنا أو اسحب الصورة</span>
               <span className="text-xs text-gray-500 mt-1">المقاس المقترح: 500 × 500 بكسل</span>
-              <span className="text-xs text-gray-500">يفضل أن تكون الصورة مربعة وواضحة</span>
+              <span className="text-xs text-gray-500">يفضل رفع صورة مربعة وواضحة</span>
+              <span className="text-xs text-gray-500">سيتم ضغط الصورة وتحويلها إلى WebP قبل الرفع</span>
               {helperText && <span className="text-xs text-brand-burgundy mt-1 font-medium">{helperText}</span>}
               <span className="text-xs text-brand-gold mt-1">PNG, JPG, WEBP (الحد الأقصى 5MB)</span>
             </div>
@@ -140,7 +188,7 @@ export default function ImageUploader({ value, onChange, folder = 'items', helpe
         <input
           type="text"
           className="flex-1 px-3 py-1.5 border rounded-md text-sm text-gray-500 bg-gray-50"
-          placeholder="أو أدخل رابط الصورة يدوياً (/menu-assets/...)"
+          placeholder="أو أدخل رابط الصورة يدوياً (https://...)"
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
         />

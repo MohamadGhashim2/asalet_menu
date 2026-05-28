@@ -59,13 +59,21 @@ export default async function middleware(request: NextRequest) {
   }
 
   if (url.pathname.startsWith('/asalaadmin26')) {
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_LOGIN_EMAIL
+
     if (url.pathname === '/asalaadmin26/login') {
-      if (user) {
+      if (user && user.email === adminEmail) {
         url.pathname = '/asalaadmin26'
         return NextResponse.redirect(url)
       }
     } else {
-      if (!user) {
+      if (!user || user.email !== adminEmail) {
+        // Automatically sign out if the user is wrong
+        if (user) {
+          // This creates a response that deletes cookies for auth, but the easiest way is to redirect to signout or login
+          url.pathname = '/auth/signout'
+          // We don't have a GET signout endpoint, so we just redirect to login which drops them
+        }
         url.pathname = '/asalaadmin26/login'
         return NextResponse.redirect(url)
       }

@@ -20,15 +20,15 @@ The QR Menu MVP has been implemented as requested.
 
 ## Next Steps
 - Execute the SQL schema (`supabase/sql/schema.sql`) in the Supabase project.
+- Execute `supabase/sql/clear-legacy-menu-assets-image-urls.sql` in your Supabase SQL editor to clean up legacy image references.
 - Configure environment variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_ADMIN_LOGIN_EMAIL`.
 - Create the `menu-images` bucket in Supabase Storage.
 - Create an admin user via Supabase Auth dashboard (the email MUST match `NEXT_PUBLIC_ADMIN_LOGIN_EMAIL`, and the password will be the access code).
-- Place actual seed data in `data/menu-import/menu.seed.json` and use the import tool.
+- Ensure all product/category images are uploaded via the admin panel. Local menu assets and the import tool have been removed.
 
 ## GitHub Deployment & Production Readiness
 This project is built as a single-client MVP ready for deployment on Vercel:
 1. **Repository Setup**: Initialize Git (`git init`), add the files (`git add .`), commit (`git commit -m "Initial MVP commit"`), and push to a private GitHub repository.
 2. **Vercel Deployment**: Link your GitHub repository to Vercel. 
 3. **Environment Variables**: Configure `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_SITE_URL` in Vercel settings.
-4. **Static Assets**: All menu item images are located under `/public/menu-assets/` and are fully tracked and deployed. No external image hosting is strictly required for the static menu options.
-
+4. **Static Assets**: Local static menu images have been removed. All images must be uploaded to the Supabase Storage bucket (`menu-images`) via the admin UI.
