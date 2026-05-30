@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/supabase'
 import { Trash2, Plus, Link as LinkIcon, Loader2 } from 'lucide-react'
+import AdminSwitch from '../../components/AdminSwitch'
 
 type OptionTemplate = Database['public']['Tables']['option_group_templates']['Row']
 type TemplateOption = Database['public']['Tables']['option_template_options']['Row']
@@ -22,6 +23,7 @@ export default function OptionTemplatesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkMessage, setBulkMessage] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
 
   async function fetchData() {
     const { data: tpls } = await supabase
@@ -42,10 +44,12 @@ export default function OptionTemplatesPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData()
   }, [])
 
   async function addTemplate() {
+    setActionMessage('')
     const { data } = await supabase.from('option_group_templates').insert({
       template_name: 'قالب جديد (اسم داخلي)',
       display_title: 'عنوان جديد (للزبائن)',
@@ -55,6 +59,7 @@ export default function OptionTemplatesPage() {
     
     if (data) {
       setTemplates([{ ...data, options: [] }, ...templates])
+      setActionMessage('تم إنشاء قالب جديد')
     }
   }
 
@@ -67,6 +72,7 @@ export default function OptionTemplatesPage() {
     if (!confirm('هل أنت متأكد من حذف هذا القالب نهائياً؟ سيتم حذفه من جميع المنتجات المرتبطة.')) return
     await supabase.from('option_group_templates').delete().eq('id', id)
     setTemplates(templates.filter(t => t.id !== id))
+    setActionMessage('تم حذف القالب')
   }
 
   async function addOption(templateId: string) {
@@ -133,115 +139,153 @@ export default function OptionTemplatesPage() {
       }
       
       setBulkMessage(`تم الربط بنجاح مع ${successCount} منتج. (تم تجاهل ${duplicateCount} منتجات لارتباطها مسبقاً)`)
-    } catch (e) {
+    } catch {
       setBulkMessage('حدث خطأ أثناء الربط.')
     }
     
     setBulkLoading(false)
   }
 
-  if (loading) return <div>جاري التحميل...</div>
+  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">جاري التحميل...</div>
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">قوالب الإضافات (Templates)</h1>
+    <div className="w-full max-w-5xl space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-brand-text">قوالب الإضافات</h1>
+          <p className="text-sm leading-6 text-brand-brown">قوالب مشتركة يمكن ربطها بعدة منتجات وتعديلها من مكان واحد.</p>
+        </div>
         <button 
+          type="button"
           onClick={addTemplate}
-          className="bg-brand-burgundy text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-brand-burgundy-dark transition-colors"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-burgundy px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark sm:w-auto"
         >
-          <Plus className="w-4 h-4" /> إنشاء قالب جديد
+          <Plus className="h-4 w-4" /> إنشاء قالب جديد
         </button>
       </div>
+
+      {actionMessage && (
+        <div className="rounded-lg border border-green-100 bg-green-50 p-4 text-sm font-bold text-green-700">
+          {actionMessage}
+        </div>
+      )}
       
-      <div className="bg-blue-50 text-blue-800 p-4 rounded-lg text-sm mb-6 border border-blue-100">
+      <div className="rounded-xl border border-brand-border bg-white p-4 text-sm text-brand-brown shadow-sm">
         <p className="font-bold mb-1">ملاحظة:</p>
         <p>التعديل على أي قالب هنا سينعكس فوراً على جميع المنتجات المرتبطة به. لا داعي لتعديل الإضافات المشتركة لكل منتج على حدة.</p>
       </div>
 
       <div className="space-y-8">
         {templates.length === 0 ? (
-          <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-12 text-center text-gray-500">
+          <div className="rounded-xl border border-dashed border-brand-border bg-white p-8 text-center text-sm text-brand-brown sm:p-12">
             لا توجد قوالب حالياً. قم بإنشاء قالب جديد لربطه بالمنتجات لاحقاً.
           </div>
         ) : (
           templates.map(template => (
-            <div key={template.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm relative">
-              <div className="absolute top-5 left-5 flex gap-2">
+            <div key={template.id} className="rounded-xl border border-brand-border bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-5 flex flex-col gap-4 border-b border-brand-border pb-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <h2 className="break-words text-lg font-bold text-brand-text">{template.template_name}</h2>
+                  <p className="break-words text-sm text-brand-brown">العنوان الظاهر للزبون: {template.display_title}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
                 <button 
+                  type="button"
                   onClick={() => {
                     setSelectedTemplate(template.id)
                     setBulkMessage('')
                     setShowBulkModal(true)
                   }}
-                  className="bg-brand-cream text-brand-burgundy border border-brand-burgundy/20 hover:bg-brand-burgundy hover:text-white p-2 rounded-lg flex items-center justify-center transition-colors shadow-sm"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-brand-burgundy/20 bg-brand-cream px-3 py-2 text-sm font-bold text-brand-burgundy shadow-sm transition-colors hover:bg-brand-burgundy hover:text-white"
                   title="ربط جماعي بقسم كامل"
                 >
-                  <LinkIcon className="w-5 h-5" />
+                  <LinkIcon className="h-4 w-4" />
+                  ربط بقسم
                 </button>
-                <button onClick={() => deleteTemplate(template.id)} className="text-red-500 bg-red-50 hover:bg-red-500 hover:text-white p-2 rounded-lg flex items-center justify-center transition-colors shadow-sm">
-                  <Trash2 className="w-5 h-5" />
+                <button type="button" onClick={() => deleteTemplate(template.id)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 shadow-sm transition-colors hover:bg-red-100">
+                  <Trash2 className="h-4 w-4" />
+                  حذف
                 </button>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-4 mb-5 pr-14 md:pr-0">
-                <div className="flex-1">
-                  <label className="block text-sm font-bold text-gray-700 mb-1">اسم القالب (داخلي للإدارة)</label>
-                  <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy bg-gray-50" value={template.template_name} onChange={e => updateTemplate(template.id, { template_name: e.target.value })} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-bold text-brand-burgundy mb-1">العنوان للزبون (Public Title)</label>
-                  <input type="text" className="w-full px-3 py-2 border border-brand-burgundy/30 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy" value={template.display_title} onChange={e => updateTemplate(template.id, { display_title: e.target.value })} />
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 mb-5">
-                <div className="w-full sm:w-1/3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">النوع</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy bg-white" value={template.kind || 'addon'} onChange={e => updateTemplate(template.id, { kind: e.target.value as never })}>
+              <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="min-w-0">
+                  <label className="mb-2 block text-sm font-bold text-gray-700">اسم القالب داخل الإدارة</label>
+                  <input type="text" className="min-h-11 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={template.template_name} onChange={e => updateTemplate(template.id, { template_name: e.target.value })} />
+                </div>
+                <div className="min-w-0">
+                  <label className="mb-2 block text-sm font-bold text-brand-burgundy">العنوان الظاهر للزبون</label>
+                  <input type="text" className="min-h-11 w-full rounded-lg border border-brand-burgundy/30 px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={template.display_title} onChange={e => updateTemplate(template.id, { display_title: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="min-w-0">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">النوع</label>
+                  <select className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={template.kind || 'addon'} onChange={e => updateTemplate(template.id, { kind: e.target.value as never })}>
                     <option value="variant">نوع (Variant)</option>
                     <option value="addon">إضافة (Addon)</option>
                     <option value="modifier">تعديل (Modifier)</option>
                   </select>
                 </div>
-                <div className="w-full sm:w-1/3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">طبيعة الاختيار</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy bg-white" value={template.selection_type || 'multiple'} onChange={e => updateTemplate(template.id, { selection_type: e.target.value as never })}>
+                <div className="min-w-0">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">طريقة الاختيار</label>
+                  <select className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={template.selection_type || 'multiple'} onChange={e => updateTemplate(template.id, { selection_type: e.target.value as never })}>
                     <option value="single">اختيار واحد</option>
                     <option value="multiple">متعدد</option>
                   </select>
                 </div>
-                <div className="w-full sm:w-1/3 flex items-end pb-1">
-                  <label className="flex items-center gap-3 p-2 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors w-full">
-                    <input type="checkbox" className="w-5 h-5 text-brand-burgundy rounded focus:ring-brand-burgundy border-gray-300" checked={template.is_required || false} onChange={e => updateTemplate(template.id, { is_required: e.target.checked })} /> 
-                    <span className="text-sm font-medium text-gray-700">إجباري</span>
-                  </label>
+                <div className="min-w-0">
+                  <AdminSwitch
+                    checked={template.is_required || false}
+                    onCheckedChange={(checked) => updateTemplate(template.id, { is_required: checked })}
+                    label="إجباري"
+                    labelPosition="start"
+                    className="flex h-[62px] w-full items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100 sm:h-auto sm:justify-start sm:rounded-lg sm:p-3"
+                    labelClassName="text-sm font-bold text-gray-700"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <AdminSwitch
+                    checked={template.is_active ?? true}
+                    onCheckedChange={(checked) => updateTemplate(template.id, { is_active: checked })}
+                    label="نشط"
+                    labelPosition="start"
+                    className="flex h-[62px] w-full items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100 sm:h-auto sm:rounded-lg sm:p-3"
+                    labelClassName="text-sm font-bold text-gray-700"
+                  />
                 </div>
               </div>
 
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <h4 className="text-sm font-bold text-gray-800 mb-3">خيارات القالب:</h4>
-                <div className="space-y-3">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                <h4 className="text-sm font-bold text-gray-800 mb-4">خيارات القالب:</h4>
+                <div className="space-y-4 sm:space-y-3">
                   {template.options.map(opt => (
-                    <div key={opt.id} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                    <div key={opt.id} className="flex flex-col sm:flex-row gap-4 sm:gap-3 items-center bg-white p-4 sm:p-3 rounded-xl sm:rounded-lg border border-gray-200 shadow-sm">
                       <div className="w-full flex-1">
-                        <label className="block text-xs font-medium text-gray-500 mb-1 sm:hidden">الاسم</label>
-                        <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.name} onChange={e => updateOption(template.id, opt.id, { name: e.target.value })} placeholder="الاسم (مثال: حجم كبير)" />
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5 sm:hidden">الاسم</label>
+                        <input type="text" className="w-full px-3 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.name} onChange={e => updateOption(template.id, opt.id, { name: e.target.value })} placeholder="الاسم (مثال: حجم كبير)" />
                       </div>
                       <div className="w-full sm:w-32 shrink-0">
-                        <label className="block text-xs font-medium text-gray-500 mb-1 sm:hidden">السعر الإضافي</label>
-                        <input type="number" step="0.01" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.price || 0} onChange={e => updateOption(template.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder="السعر" />
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5 sm:hidden">السعر الإضافي</label>
+                        <input type="number" step="0.01" className="w-full px-3 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.price || 0} onChange={e => updateOption(template.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder="السعر" />
                       </div>
-                      <div className="w-full sm:w-auto flex justify-end shrink-0">
-                        <button onClick={() => deleteOption(template.id, opt.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg flex items-center justify-center transition-colors w-full sm:w-auto mt-1 sm:mt-0 border border-red-100 sm:border-none bg-red-50 sm:bg-transparent">
-                          <Trash2 className="w-4 h-4 sm:mr-0 mr-2" />
-                          <span className="text-sm sm:hidden font-medium">حذف الخيار</span>
+                      <div className="w-full sm:w-auto flex justify-end shrink-0 pt-1 sm:pt-0">
+                        <button type="button" onClick={() => deleteOption(template.id, opt.id)} className="text-red-600 bg-red-50 sm:bg-transparent border border-red-100 sm:border-transparent hover:bg-red-100 py-3 sm:py-2 px-4 sm:px-2 rounded-xl sm:rounded-lg flex items-center justify-center transition-colors w-full sm:w-auto font-bold">
+                          <Trash2 className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-0 mr-2" />
+                          <span className="text-sm sm:hidden">حذف الخيار</span>
                         </button>
                       </div>
                     </div>
                   ))}
-                  <button onClick={() => addOption(template.id)} className="w-full sm:w-auto mt-2 px-4 py-3 sm:py-2 bg-brand-burgundy/10 text-brand-burgundy hover:bg-brand-burgundy/20 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors text-sm">
-                    <Plus className="w-4 h-4" /> إضافة خيار
+                  {template.options.length === 0 && (
+                    <div className="rounded-lg border border-dashed border-gray-300 bg-white p-4 text-center text-sm text-gray-500">
+                      لا توجد خيارات داخل هذا القالب.
+                    </div>
+                  )}
+                  <button type="button" onClick={() => addOption(template.id)} className="w-full sm:w-auto mt-3 px-6 py-3.5 sm:py-2.5 bg-brand-burgundy/10 text-brand-burgundy hover:bg-brand-burgundy/20 rounded-xl sm:rounded-lg font-bold flex items-center justify-center gap-2 transition-colors text-sm">
+                    <Plus className="w-5 h-5 sm:w-4 sm:h-4" /> إضافة خيار
                   </button>
                 </div>
               </div>
@@ -253,7 +297,7 @@ export default function OptionTemplatesPage() {
       {/* Bulk Link Modal */}
       {showBulkModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
             <h3 className="text-xl font-bold mb-4">ربط القالب بقسم كامل</h3>
             <p className="text-gray-600 mb-6 text-sm">سيتم ربط القالب المختار بجميع المنتجات داخل القسم المحدد. سيتم تجاهل المنتجات المرتبطة مسبقاً بهذا القالب.</p>
             
@@ -277,18 +321,20 @@ export default function OptionTemplatesPage() {
               </div>
             )}
             
-            <div className="flex gap-3 justify-end">
+            <div className="grid grid-cols-1 gap-3 sm:flex sm:justify-end">
               <button 
+                type="button"
                 onClick={() => setShowBulkModal(false)}
-                className="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                className="min-h-11 rounded-lg px-5 py-2.5 font-medium text-gray-600 transition-colors hover:bg-gray-100"
                 disabled={bulkLoading}
               >
                 إغلاق
               </button>
               <button 
+                type="button"
                 onClick={handleBulkLink}
                 disabled={!selectedCategory || bulkLoading}
-                className="bg-brand-burgundy text-white px-5 py-2.5 rounded-lg font-medium hover:bg-brand-burgundy-dark disabled:opacity-50 flex items-center gap-2 transition-colors"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand-burgundy px-5 py-2.5 font-medium text-white transition-colors hover:bg-brand-burgundy-dark disabled:opacity-50"
               >
                 {bulkLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LinkIcon className="w-5 h-5" />}
                 بدء الربط

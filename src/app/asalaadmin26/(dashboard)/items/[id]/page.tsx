@@ -6,6 +6,8 @@ import { Database } from '@/types/supabase'
 import { useRouter } from 'next/navigation'
 import { Trash2, Plus } from 'lucide-react'
 import ImageUploader from '../../../components/ImageUploader'
+import AdminSwitch from '../../../components/AdminSwitch'
+import { deleteMenuImagesIfUnused } from '@/lib/storage-images'
 
 type Category = Database['public']['Tables']['categories']['Row']
 type MenuItem = Database['public']['Tables']['menu_items']['Row']
@@ -23,6 +25,9 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
+  const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null)
+  const [imageUrlsPendingCleanup, setImageUrlsPendingCleanup] = useState<string[]>([])
   
   const [item, setItem] = useState<Partial<MenuItem>>({
     name: '',
@@ -69,6 +74,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
       const { data } = await supabase.from('menu_items').select('*').eq('id', id).single()
       if (data) {
         setItem(data)
+        setSavedImageUrl(data.image_url || null)
         setBasePriceInput(data.base_price !== null ? String(data.base_price) : '')
         const { data: groupsData } = await supabase.from('item_option_groups').select('*, options:item_options(*)').eq('item_id', id).order('sort_order')
         if (groupsData) {
@@ -88,28 +94,135 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData()
   }, [id])
+
+  function handleProductImageChange(url: string | null) {
+    const currentImageUrl = item.image_url || null
+
+    if (currentImageUrl && currentImageUrl !== url) {
+      setImageUrlsPendingCleanup(prev => (
+        prev.includes(currentImageUrl) ? prev : [...prev, currentImageUrl]
+      ))
+    }
+
+    setItem(prev => ({ ...prev, image_url: url }))
+  }
+
+  async function cleanupUnusedImages(imageUrls: Array<string | null | undefined>) {
+    const cleanupResults = await deleteMenuImagesIfUnused(supabase, imageUrls)
+    const cleanupError = cleanupResults.find(result => result.error)?.error
+
+    if (cleanupError) {
+      console.warn('Storage image cleanup failed:', cleanupError)
+    }
+
+    return cleanupError
+  }
 
   async function saveItem(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
+    setSaveMessage('')
 
+    const nextImageUrl = item.image_url?.trim() || null
     const payload = {
       ...item,
+      image_url: nextImageUrl,
       base_price: basePriceInput.trim() === '' ? null : parseFloat(basePriceInput)
     }
 
     if (isNew) {
       const { data, error } = await supabase.from('menu_items').insert(payload as never).select().single()
+      if (error) {
+        setSaveMessage('حدث خطأ أثناء حفظ المنتج: ' + error.message)
+        setSaving(false)
+        return
+      }
       if (data) {
+        const cleanupError = await cleanupUnusedImages(imageUrlsPendingCleanup.filter(url => url !== nextImageUrl))
+        setSavedImageUrl(nextImageUrl)
+        setImageUrlsPendingCleanup([])
+        if (cleanupError) {
+          console.warn('Storage image cleanup warning after creating product:', cleanupError)
+        }
         router.push(`/asalaadmin26/items/${data.id}`)
       }
     } else {
-      await supabase.from('menu_items').update(payload as never).eq('id', id)
-      alert('تم الحفظ بنجاح')
+      const { error } = await supabase.from('menu_items').update(payload as never).eq('id', id)
+      if (error) {
+        setSaveMessage('حدث خطأ أثناء حفظ المنتج: ' + error.message)
+      } else {
+        const cleanupCandidates = [
+          savedImageUrl && savedImageUrl !== nextImageUrl ? savedImageUrl : null,
+          ...imageUrlsPendingCleanup.filter(url => url !== nextImageUrl),
+        ]
+        const cleanupError = await cleanupUnusedImages(cleanupCandidates)
+
+        setItem(prev => ({ ...prev, image_url: nextImageUrl }))
+        setSavedImageUrl(nextImageUrl)
+        setImageUrlsPendingCleanup([])
+        setSaveMessage(cleanupError
+          ? 'تم حفظ المنتج بنجاح، لكن تعذر حذف الصورة القديمة من التخزين: ' + cleanupError
+          : 'تم حفظ المنتج بنجاح')
+      }
     }
     setSaving(false)
+  }
+
+  async function clearProductImage() {
+    const currentImageUrl = item.image_url || null
+    const cleanupCandidates = [currentImageUrl, savedImageUrl, ...imageUrlsPendingCleanup]
+
+    setSaveMessage('')
+
+    if (isNew) {
+      const cleanupError = await cleanupUnusedImages(cleanupCandidates)
+      setItem(prev => ({ ...prev, image_url: null }))
+      setImageUrlsPendingCleanup([])
+      setSaveMessage(cleanupError
+        ? 'تم حذف الصورة من النموذج، لكن تعذر حذف ملف التخزين: ' + cleanupError
+        : 'تم حذف الصورة من النموذج')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .update({ image_url: null })
+        .eq('id', id)
+
+      if (error) {
+        throw new Error('حدث خطأ أثناء حذف الصورة: ' + error.message)
+      }
+
+      const cleanupError = await cleanupUnusedImages(cleanupCandidates)
+      setItem(prev => ({ ...prev, image_url: null }))
+      setSavedImageUrl(null)
+      setImageUrlsPendingCleanup([])
+      setSaveMessage(cleanupError
+        ? 'تم حذف الصورة من المنتج، لكن تعذر حذف ملف التخزين: ' + cleanupError
+        : 'تم حذف الصورة من المنتج')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function leaveProductPage() {
+    const currentImageUrl = item.image_url || null
+    const cleanupCandidates = [
+      currentImageUrl && currentImageUrl !== savedImageUrl ? currentImageUrl : null,
+      ...imageUrlsPendingCleanup.filter(url => url !== savedImageUrl),
+    ]
+
+    const cleanupError = await cleanupUnusedImages(cleanupCandidates)
+    if (cleanupError) {
+      console.warn('Storage image cleanup warning before leaving product page:', cleanupError)
+    }
+
+    router.push('/asalaadmin26/items')
   }
 
   async function addGroup() {
@@ -260,164 +373,296 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
     alert('تم تحويل المجموعة إلى قالب وربطها بنجاح');
   }
 
-  if (loading) return <div>جاري التحميل...</div>
+  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">جاري التحميل...</div>
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">{isNew ? 'إضافة منتج' : 'تعديل المنتج'}</h1>
-        <button onClick={() => router.push('/asalaadmin26/items')} className="text-gray-600 hover:text-gray-900">العودة للمنتجات</button>
+    <div className="w-full max-w-5xl space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <h1 className="break-words text-2xl font-bold text-brand-text">{isNew ? 'إضافة منتج' : 'تعديل المنتج'}</h1>
+          <p className="text-sm leading-6 text-brand-brown">عدّل بيانات المنتج وصورته وخياراته من أقسام واضحة.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:shrink-0">
+          <button
+            type="button"
+            onClick={leaveProductPage}
+            className="min-h-11 rounded-xl border border-brand-border bg-white px-4 py-2 text-sm font-bold text-brand-brown transition-colors hover:bg-brand-cream"
+          >
+            العودة للمنتجات
+          </button>
+          <button
+            type="submit"
+            form="product-form"
+            disabled={saving}
+            className="min-h-11 rounded-xl bg-brand-burgundy px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:opacity-50"
+          >
+            {saving ? 'جاري الحفظ...' : 'حفظ المنتج'}
+          </button>
+        </div>
       </div>
 
-      <form onSubmit={saveItem} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">الاسم</label>
-            <input required type="text" className="w-full px-3 py-2 border rounded-md" value={item.name} onChange={e => setItem({ ...item, name: e.target.value })} />
+      {saveMessage && (
+        <div className={`rounded-lg border p-4 text-sm font-bold ${saveMessage.includes('خطأ') ? 'border-red-100 bg-red-50 text-red-700' : saveMessage.includes('تعذر') ? 'border-amber-100 bg-amber-50 text-amber-800' : 'border-green-100 bg-green-50 text-green-700'}`}>
+          {saveMessage}
+        </div>
+      )}
+
+      <form id="product-form" onSubmit={saveItem} className="space-y-6">
+        <section className="rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5 space-y-1">
+            <h2 className="text-xl font-bold text-brand-text">بيانات المنتج</h2>
+            <p className="text-sm leading-6 text-brand-brown">الاسم والقسم والسعر والحالة الأساسية.</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">القسم</label>
-            <select required className="w-full px-3 py-2 border rounded-md" value={item.category_id || ''} onChange={e => setItem({ ...item, category_id: e.target.value })}>
-              <option value="">اختر القسم</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="min-w-0">
+              <label className="mb-2 block text-sm font-bold text-brand-text">الاسم</label>
+              <input required type="text" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={item.name} onChange={e => setItem({ ...item, name: e.target.value })} />
+            </div>
+            <div className="min-w-0">
+              <label className="mb-2 block text-sm font-bold text-brand-text">القسم</label>
+              <select required className="min-h-11 w-full rounded-lg border border-brand-border bg-white px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={item.category_id || ''} onChange={e => setItem({ ...item, category_id: e.target.value })}>
+                <option value="">اختر القسم</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="min-w-0 md:col-span-2">
+              <label className="mb-2 block text-sm font-bold text-brand-text">الوصف</label>
+              <textarea className="w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" rows={4} value={item.description || ''} onChange={e => setItem({ ...item, description: e.target.value })} />
+            </div>
+            <div className="min-w-0">
+              <label className="mb-2 block text-sm font-bold text-brand-text">السعر الأساسي</label>
+              <input type="number" step="0.01" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={basePriceInput} onChange={e => setBasePriceInput(e.target.value)} placeholder="اتركه فارغاً إذا كان يعتمد على الخيارات" />
+            </div>
+            <div className="min-w-0">
+              <label className="mb-2 block text-sm font-bold text-brand-text">ترتيب الظهور</label>
+              <input type="number" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={item.sort_order || 0} onChange={e => setItem({ ...item, sort_order: parseInt(e.target.value) || 0 })} />
+            </div>
           </div>
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
-            <textarea className="w-full px-3 py-2 border rounded-md" rows={3} value={item.description || ''} onChange={e => setItem({ ...item, description: e.target.value })} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">السعر الأساسي (اتركه فارغاً إذا كان يعتمد على الخيارات)</label>
-            <input type="number" step="0.01" className="w-full px-3 py-2 border rounded-md" value={basePriceInput} onChange={e => setBasePriceInput(e.target.value)} />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">صورة المنتج</label>
-            <ImageUploader 
-              value={item.image_url || null} 
-              onChange={(url) => setItem({ ...item, image_url: url })} 
+
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <AdminSwitch
+              checked={item.is_available || false}
+              onCheckedChange={(checked) => setItem({ ...item, is_available: checked })}
+              label="متاح للطلب"
+              labelPosition="start"
+              className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-brand-border bg-brand-cream/40 p-4 hover:bg-brand-cream"
+              labelClassName="text-sm font-bold text-brand-text"
+            />
+            <AdminSwitch
+              checked={item.is_featured || false}
+              onCheckedChange={(checked) => setItem({ ...item, is_featured: checked })}
+              label="منتج مميز"
+              labelPosition="start"
+              className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-brand-border bg-brand-cream/40 p-4 hover:bg-brand-cream"
+              labelClassName="text-sm font-bold text-brand-text"
             />
           </div>
-          <div className="flex items-center gap-4 mt-4">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={item.is_available || false} onChange={e => setItem({ ...item, is_available: e.target.checked })} />
-              <span className="text-sm">متاح للطلب</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={item.is_featured || false} onChange={e => setItem({ ...item, is_featured: e.target.checked })} />
-              <span className="text-sm">منتج مميز</span>
-            </label>
+        </section>
+
+        <section className="rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5 space-y-1">
+            <h2 className="text-xl font-bold text-brand-text">صورة المنتج</h2>
+            <p className="text-sm leading-6 text-brand-brown">المقاس المقترح: 500 × 500 بكسل</p>
+            <p className="text-sm leading-6 text-brand-brown">يفضل رفع صورة مربعة وواضحة</p>
           </div>
-        </div>
-        
-        <button type="submit" disabled={saving} className="bg-brand-burgundy text-white px-6 py-2 rounded-md hover:bg-brand-burgundy-dark disabled:opacity-50">
-          {saving ? 'جاري الحفظ...' : 'حفظ المنتج'}
-        </button>
+          <div>
+            <ImageUploader 
+              value={item.image_url || null} 
+              onChange={handleProductImageChange}
+              onClear={clearProductImage}
+            />
+          </div>
+        </section>
       </form>
 
-      <div className="space-y-4">
-        <div className="flex justify-between items-center mt-8">
-          <h2 className="text-xl font-bold text-gray-900">مجموعات الخيارات (Variants/Addons)</h2>
+      <section className="space-y-4 rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold text-brand-text">القوالب المرتبطة</h2>
+          <p className="text-sm leading-6 text-brand-brown">اربط المنتج بقوالب إضافات مشتركة مثل الأحجام أو الإضافات المتكررة.</p>
+        </div>
+
+        {isNew ? (
+          <div className="rounded-xl border border-dashed border-brand-border bg-brand-cream/40 p-6 text-center text-sm text-brand-brown">
+            يرجى حفظ المنتج أولاً لتتمكن من ربط القوالب.
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div className="rounded-xl border border-brand-border bg-brand-cream/50 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div className="min-w-0">
+                  <label className="mb-2 block text-sm font-bold text-brand-text">اختر قالباً لربطه بهذا المنتج</label>
+                  <select
+                    className="min-h-11 w-full rounded-lg border border-brand-border bg-white px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10"
+                    value={selectedTemplateToLink}
+                    onChange={e => setSelectedTemplateToLink(e.target.value)}
+                  >
+                    <option value="">-- اختر قالب --</option>
+                    {availableTemplates.map(t => (
+                      <option key={t.id} value={t.id}>{t.template_name} (يظهر للزبون: {t.display_title})</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={linkTemplate}
+                  disabled={!selectedTemplateToLink}
+                  className="flex min-h-11 w-full items-center justify-center rounded-xl bg-brand-burgundy px-6 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:opacity-50 sm:w-auto"
+                >
+                  ربط القالب
+                </button>
+              </div>
+            </div>
+
+            {linkedTemplates.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">لا توجد قوالب مرتبطة حالياً بهذا المنتج.</div>
+            ) : (
+              <div className="grid gap-4">
+                {linkedTemplates.map(link => (
+                  <div key={link.id} className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="break-words font-bold text-gray-800">{link.option_group_templates.template_name}</h3>
+                      <p className="mt-1 break-words text-sm leading-6 text-gray-500">النوع: {link.option_group_templates.kind} | يظهر للزبون كـ: {link.option_group_templates.display_title}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => unlinkTemplate(link.id)}
+                      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 sm:w-auto"
+                    >
+                      <Trash2 className="h-4 w-4" /> فك الارتباط
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:flex-row sm:items-start sm:justify-between sm:p-6">
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold text-brand-text">مجموعات الخيارات</h2>
+            <p className="text-sm leading-6 text-brand-brown">خيارات خاصة بهذا المنتج فقط، مثل الحجم أو الإضافات.</p>
+          </div>
           <button 
             type="button" 
             onClick={addGroup} 
             disabled={isNew}
-            className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm ${isNew ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
+            className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors sm:w-auto ${isNew ? 'cursor-not-allowed bg-gray-200 text-gray-500' : 'bg-brand-burgundy text-white hover:bg-brand-burgundy-dark'}`}
           >
-            <Plus className="w-4 h-4" /> إضافة مجموعة
+            <Plus className="h-4 w-4" /> إضافة مجموعة
           </button>
         </div>
 
         {isNew ? (
-          <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-500">
-            يرجى حفظ المنتج أولاً لتتمكن من إضافة الخيارات والتعديلات
+          <div className="rounded-xl border border-dashed border-brand-border bg-white p-8 text-center text-sm text-brand-brown">
+            يرجى حفظ المنتج أولاً لتتمكن من إضافة الخيارات والتعديلات.
+          </div>
+        ) : groups.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-brand-border bg-white p-8 text-center text-sm text-brand-brown">
+            لا توجد مجموعات خيارات خاصة بهذا المنتج.
           </div>
         ) : (
           groups.map(group => (
-            <div key={group.id} className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm mb-6 last:mb-0">
-              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
-                <h3 className="font-bold text-gray-800">مجموعة خيارات</h3>
-                <button onClick={() => deleteGroup(group.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg flex items-center justify-center transition-colors">
-                  <Trash2 className="w-5 h-5" />
+            <div key={group.id} className="rounded-xl border border-brand-border bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-5 flex flex-col gap-3 border-b border-brand-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <h3 className="min-w-0 break-words text-lg font-bold text-brand-text">{group.title || 'مجموعة خيارات'}</h3>
+                <button type="button" onClick={() => deleteGroup(group.id)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 sm:w-auto">
+                  <Trash2 className="h-4 w-4" />
+                  حذف المجموعة
                 </button>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 mb-5">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">عنوان المجموعة</label>
-                  <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy" value={group.title} onChange={e => updateGroup(group.id, { title: e.target.value })} />
+              <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="min-w-0 md:col-span-2">
+                  <label className="mb-2 block text-sm font-bold text-gray-700">عنوان المجموعة</label>
+                  <input type="text" className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={group.title} onChange={e => updateGroup(group.id, { title: e.target.value })} />
                 </div>
-                <div className="w-full sm:w-40">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">النوع</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy bg-white" value={group.kind || 'variant'} onChange={e => updateGroup(group.id, { kind: e.target.value as never })}>
+                <div className="min-w-0">
+                  <label className="mb-2 block text-sm font-bold text-gray-700">النوع</label>
+                  <select className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={group.kind || 'variant'} onChange={e => updateGroup(group.id, { kind: e.target.value as never })}>
                     <option value="variant">نوع (Variant)</option>
                     <option value="addon">إضافة (Addon)</option>
                     <option value="modifier">تعديل (Modifier)</option>
                   </select>
                 </div>
-                <div className="w-full sm:w-40">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">طبيعة الاختيار</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-brand-burgundy focus:border-brand-burgundy bg-white" value={group.selection_type || 'single'} onChange={e => updateGroup(group.id, { selection_type: e.target.value as never })}>
+                <div className="min-w-0">
+                  <label className="mb-2 block text-sm font-bold text-gray-700">طريقة الاختيار</label>
+                  <select className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={group.selection_type || 'single'} onChange={e => updateGroup(group.id, { selection_type: e.target.value as never })}>
                     <option value="single">اختيار واحد</option>
                     <option value="multiple">متعدد</option>
                   </select>
                 </div>
+                <AdminSwitch
+                  checked={group.is_required || false}
+                  onCheckedChange={(checked) => updateGroup(group.id, { is_required: checked })}
+                  label="إجباري"
+                  labelPosition="start"
+                  className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100"
+                  labelClassName="text-sm font-bold text-gray-700"
+                />
+                <AdminSwitch
+                  checked={group.is_active ?? true}
+                  onCheckedChange={(checked) => updateGroup(group.id, { is_active: checked })}
+                  label="نشط"
+                  labelPosition="start"
+                  className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100"
+                  labelClassName="text-sm font-bold text-gray-700"
+                />
               </div>
 
-              <div className="mb-6">
-                <label className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors w-full sm:w-fit">
-                  <input type="checkbox" className="w-5 h-5 text-brand-burgundy rounded focus:ring-brand-burgundy border-gray-300" checked={group.is_required || false} onChange={e => updateGroup(group.id, { is_required: e.target.checked })} /> 
-                  <span className="text-sm font-medium text-gray-700">إجباري (يجب اختيار خيار واحد على الأقل)</span>
-                </label>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <h4 className="text-sm font-bold text-gray-800 mb-3">الخيارات:</h4>
-                <div className="space-y-3">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                <h4 className="mb-4 text-sm font-bold text-gray-800">الخيارات:</h4>
+                <div className="space-y-4 sm:space-y-3">
                   {group.options.map(opt => (
-                    <div key={opt.id} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                      <div className="w-full flex-1">
-                        <label className="block text-xs font-medium text-gray-500 mb-1 sm:hidden">الاسم</label>
-                        <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.name} onChange={e => updateOption(group.id, opt.id, { name: e.target.value })} placeholder="الاسم (مثال: حجم كبير)" />
+                    <div key={opt.id} className="grid grid-cols-1 gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-[1fr_9rem_auto] sm:items-end sm:gap-3 sm:rounded-lg sm:p-3">
+                      <div className="min-w-0">
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5 sm:hidden">الاسم</label>
+                        <input type="text" className="w-full px-3 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.name} onChange={e => updateOption(group.id, opt.id, { name: e.target.value })} placeholder="الاسم (مثال: حجم كبير)" />
                       </div>
-                      <div className="w-full sm:w-32 shrink-0">
-                        <label className="block text-xs font-medium text-gray-500 mb-1 sm:hidden">السعر الإضافي</label>
-                        <input type="number" step="0.01" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.price || 0} onChange={e => updateOption(group.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder="السعر الإضافي" />
+                      <div className="min-w-0">
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5 sm:hidden">السعر الإضافي</label>
+                        <input type="number" step="0.01" className="w-full px-3 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.price || 0} onChange={e => updateOption(group.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder="السعر الإضافي" />
                       </div>
-                      <div className="w-full sm:w-auto flex justify-end shrink-0">
-                        <button onClick={() => deleteOption(group.id, opt.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg flex items-center justify-center transition-colors w-full sm:w-auto mt-1 sm:mt-0 border border-red-100 sm:border-none bg-red-50 sm:bg-transparent">
-                          <Trash2 className="w-4 h-4 sm:mr-0 mr-2" />
-                          <span className="text-sm sm:hidden font-medium">حذف الخيار</span>
+                      <div className="w-full sm:w-auto">
+                        <button type="button" onClick={() => deleteOption(group.id, opt.id)} className="text-red-600 bg-red-50 sm:bg-transparent border border-red-100 sm:border-transparent hover:bg-red-100 py-3 sm:py-2 px-4 sm:px-2 rounded-xl sm:rounded-lg flex items-center justify-center transition-colors w-full sm:w-auto font-bold">
+                          <Trash2 className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-0 mr-2" />
+                          <span className="text-sm sm:hidden">حذف الخيار</span>
                         </button>
                       </div>
                     </div>
                   ))}
-                  <button onClick={() => addOption(group.id)} className="w-full sm:w-auto mt-2 px-4 py-3 sm:py-2 bg-brand-burgundy/10 text-brand-burgundy hover:bg-brand-burgundy/20 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors text-sm">
-                    <Plus className="w-4 h-4" /> إضافة خيار
+                  {group.options.length === 0 && (
+                    <div className="rounded-lg border border-dashed border-gray-300 bg-white p-4 text-center text-sm text-gray-500">
+                      لا توجد خيارات في هذه المجموعة.
+                    </div>
+                  )}
+                  <button type="button" onClick={() => addOption(group.id)} className="w-full sm:w-auto mt-3 px-6 py-3.5 sm:py-2.5 bg-brand-burgundy/10 text-brand-burgundy hover:bg-brand-burgundy/20 rounded-xl sm:rounded-lg font-bold flex items-center justify-center gap-2 transition-colors text-sm">
+                    <Plus className="w-5 h-5 sm:w-4 sm:h-4" /> إضافة خيار
                   </button>
                 </div>
               </div>
               
               {/* Convert to Template Section */}
-              <div className="mt-6 pt-4 border-t border-gray-100">
-                <label className="flex items-center gap-2 cursor-pointer mb-3 w-fit">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 text-brand-burgundy rounded focus:ring-brand-burgundy border-gray-300"
-                    checked={templateStates[group.id]?.checked || false}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setTemplateStates(prev => ({
-                        ...prev,
-                        [group.id]: {
-                          checked,
-                          template_name: prev[group.id]?.template_name || group.title,
-                          display_title: prev[group.id]?.display_title || group.title
-                        }
-                      }));
-                    }}
-                  />
-                  <span className="text-sm font-bold text-brand-burgundy">حفظ هذه المجموعة كقالب (اختياري)</span>
-                </label>
+              <div className="mt-6 pt-5 border-t border-gray-100">
+                <AdminSwitch
+                  checked={templateStates[group.id]?.checked || false}
+                  onCheckedChange={(checked) => {
+                    setTemplateStates(prev => ({
+                      ...prev,
+                      [group.id]: {
+                        checked,
+                        template_name: prev[group.id]?.template_name || group.title,
+                        display_title: prev[group.id]?.display_title || group.title
+                      }
+                    }));
+                  }}
+                  label="حفظ هذه المجموعة كقالب (اختياري)"
+                  labelPosition="start"
+                  className="mb-4 flex w-full items-center justify-between gap-4 rounded-xl border border-brand-burgundy/10 bg-brand-cream/30 p-4 hover:bg-brand-cream/50 sm:w-fit sm:justify-start sm:rounded-lg sm:p-3"
+                  labelClassName="text-sm font-bold text-brand-burgundy"
+                />
                 
                 {templateStates[group.id]?.checked && (
                   <div className="bg-brand-cream/50 p-4 rounded-lg border border-brand-burgundy/20 space-y-4">
@@ -444,8 +689,9 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                     </div>
                     <div className="flex justify-end">
                       <button 
+                        type="button"
                         onClick={() => convertToTemplate(group)}
-                        className="bg-brand-burgundy text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-burgundy-dark transition-colors shadow-sm"
+                        className="min-h-11 w-full rounded-xl bg-brand-burgundy px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-burgundy-dark sm:w-auto"
                       >
                         تأكيد وحفظ كقالب
                       </button>
@@ -457,66 +703,22 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
             </div>
           ))
         )}
-      </div>
+      </section>
 
-      <div className="space-y-4 mt-12 border-t pt-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-900">القوالب المرتبطة (Linked Templates)</h2>
+      <section className="rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-4 space-y-1">
+          <h2 className="text-xl font-bold text-brand-text">حفظ المنتج</h2>
+          <p className="text-sm leading-6 text-brand-brown">احفظ بيانات المنتج الأساسية والصورة. تغييرات الخيارات والقوالب تحفظ مباشرة عند تعديلها.</p>
         </div>
-
-        {isNew ? (
-          <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-500">
-            يرجى حفظ المنتج أولاً لتتمكن من ربط القوالب
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="bg-blue-50 p-4 sm:p-5 rounded-xl border border-blue-100 flex flex-col sm:flex-row gap-4 items-end">
-              <div className="w-full flex-1">
-                <label className="block text-sm font-medium text-blue-900 mb-1">اختر قالباً لربطه بهذا المنتج</label>
-                <select 
-                  className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white"
-                  value={selectedTemplateToLink}
-                  onChange={e => setSelectedTemplateToLink(e.target.value)}
-                >
-                  <option value="">-- اختر قالب --</option>
-                  {availableTemplates.map(t => (
-                    <option key={t.id} value={t.id}>{t.template_name} (يظهر للزبون: {t.display_title})</option>
-                  ))}
-                </select>
-              </div>
-              <button 
-                type="button" 
-                onClick={linkTemplate}
-                disabled={!selectedTemplateToLink}
-                className="bg-blue-600 text-white w-full sm:w-auto px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium h-[42px] flex items-center justify-center"
-              >
-                ربط القالب
-              </button>
-            </div>
-
-            {linkedTemplates.length === 0 ? (
-              <div className="text-gray-500 text-sm text-center py-4 bg-gray-50 rounded-lg border border-gray-100">لا توجد قوالب مرتبطة حالياً بهذا المنتج.</div>
-            ) : (
-              <div className="grid gap-4">
-                {linkedTemplates.map(link => (
-                  <div key={link.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <h3 className="font-bold text-gray-800">{link.option_group_templates.template_name}</h3>
-                      <p className="text-sm text-gray-500 mt-1">النوع: {link.option_group_templates.kind} | يظهر للزبون كـ: {link.option_group_templates.display_title}</p>
-                    </div>
-                    <button 
-                      onClick={() => unlinkTemplate(link.id)} 
-                      className="text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm font-medium border border-red-100 w-full sm:w-auto"
-                    >
-                      <Trash2 className="w-4 h-4" /> فك الارتباط
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+        <button
+          type="submit"
+          form="product-form"
+          disabled={saving}
+          className="flex min-h-12 w-full items-center justify-center rounded-xl bg-brand-burgundy px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:opacity-50 sm:w-auto"
+        >
+          {saving ? 'جاري الحفظ...' : 'حفظ المنتج'}
+        </button>
+      </section>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { Database } from '@/types/supabase'
 import { Plus, Edit2, Trash2, Image as ImageIcon } from 'lucide-react'
 import ImageUploader from '../../components/ImageUploader'
 import Image from 'next/image'
+import { deleteMenuImagesIfUnused } from '@/lib/storage-images'
 
 type Category = Database['public']['Tables']['categories']['Row']
 
@@ -19,14 +20,20 @@ export default function CategoriesPage() {
   const [newName, setNewName] = useState('')
   const [newSort, setNewSort] = useState(0)
   const [newImageUrl, setNewImageUrl] = useState<string | null>(null)
+  const [addingSaving, setAddingSaving] = useState(false)
+  const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState('')
   
   const [editImageUrl, setEditImageUrl] = useState<string | null>(null)
+  const [editOriginalImageUrl, setEditOriginalImageUrl] = useState<string | null>(null)
+  const [newImageUrlsPendingCleanup, setNewImageUrlsPendingCleanup] = useState<string[]>([])
+  const [editImageUrlsPendingCleanup, setEditImageUrlsPendingCleanup] = useState<string[]>([])
   
   const supabase = createClient()
 
   async function fetchCategories() {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('categories')
       .select('*')
       .order('sort_order', { ascending: true })
@@ -40,57 +47,208 @@ export default function CategoriesPage() {
     fetchCategories()
   }, [])
 
-  
+  async function cleanupUnusedImages(imageUrls: Array<string | null | undefined>) {
+    const cleanupResults = await deleteMenuImagesIfUnused(supabase, imageUrls)
+    const cleanupError = cleanupResults.find(result => result.error)?.error
+
+    if (cleanupError) {
+      console.warn('Storage image cleanup failed:', cleanupError)
+    }
+
+    return cleanupError
+  }
+
+  function handleNewImageChange(url: string | null) {
+    const currentImageUrl = newImageUrl || null
+
+    if (currentImageUrl && currentImageUrl !== url) {
+      setNewImageUrlsPendingCleanup(prev => (
+        prev.includes(currentImageUrl) ? prev : [...prev, currentImageUrl]
+      ))
+    }
+
+    setNewImageUrl(url)
+  }
+
+  function handleEditImageChange(url: string | null) {
+    const currentImageUrl = editImageUrl || null
+
+    if (currentImageUrl && currentImageUrl !== url) {
+      setEditImageUrlsPendingCleanup(prev => (
+        prev.includes(currentImageUrl) ? prev : [...prev, currentImageUrl]
+      ))
+    }
+
+    setEditImageUrl(url)
+  }
+
+  async function clearNewCategoryImage() {
+    const cleanupError = await cleanupUnusedImages([newImageUrl, ...newImageUrlsPendingCleanup])
+    setNewImageUrl(null)
+    setNewImageUrlsPendingCleanup([])
+    setStatusMessage(cleanupError
+      ? 'تم حذف الصورة من النموذج، لكن تعذر حذف ملف التخزين: ' + cleanupError
+      : 'تم حذف الصورة من النموذج')
+  }
+
+  async function clearEditingCategoryImage(id: string) {
+    const cleanupCandidates = [editImageUrl, editOriginalImageUrl, ...editImageUrlsPendingCleanup]
+    setSavingCategoryId(id)
+    setStatusMessage('')
+
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update({ image_url: null })
+        .eq('id', id)
+
+      if (error) {
+        throw new Error('حدث خطأ أثناء حذف الصورة: ' + error.message)
+      }
+
+      const cleanupError = await cleanupUnusedImages(cleanupCandidates)
+      setCategories(categories.map(c => c.id === id ? { ...c, image_url: null } : c))
+      setEditImageUrl(null)
+      setEditOriginalImageUrl(null)
+      setEditImageUrlsPendingCleanup([])
+      setStatusMessage(cleanupError
+        ? 'تم حذف صورة القسم، لكن تعذر حذف ملف التخزين: ' + cleanupError
+        : 'تم حذف صورة القسم')
+    } finally {
+      setSavingCategoryId(null)
+    }
+  }
+
+  async function cancelAdd() {
+    const cleanupError = await cleanupUnusedImages([newImageUrl, ...newImageUrlsPendingCleanup])
+    setIsAdding(false)
+    setNewName('')
+    setNewSort(0)
+    setNewImageUrl(null)
+    setNewImageUrlsPendingCleanup([])
+
+    if (cleanupError) {
+      setStatusMessage('تم إلغاء الإضافة، لكن تعذر حذف الصورة المرفوعة من التخزين: ' + cleanupError)
+    }
+  }
+
+  async function cancelEdit() {
+    const cleanupCandidates = [
+      editImageUrl && editImageUrl !== editOriginalImageUrl ? editImageUrl : null,
+      ...editImageUrlsPendingCleanup,
+    ]
+    const cleanupError = await cleanupUnusedImages(cleanupCandidates)
+
+    setIsEditing(null)
+    setEditImageUrl(null)
+    setEditOriginalImageUrl(null)
+    setEditImageUrlsPendingCleanup([])
+
+    if (cleanupError) {
+      setStatusMessage('تم إلغاء التعديل، لكن تعذر حذف الصورة المرفوعة من التخزين: ' + cleanupError)
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!newName.trim()) return
+    setAddingSaving(true)
+    setStatusMessage('')
 
+    const nextImageUrl = newImageUrl?.trim() || null
     const { data, error } = await supabase
       .from('categories')
-      .insert({ name: newName, sort_order: newSort, image_url: newImageUrl })
+      .insert({ name: newName, sort_order: newSort, image_url: nextImageUrl })
       .select()
       .single()
 
     if (error) {
-      alert('حدث خطأ أثناء الإضافة: ' + error.message)
+      setStatusMessage('حدث خطأ أثناء إضافة القسم: ' + error.message)
       console.error(error)
+      setAddingSaving(false)
       return
     }
 
     if (data) {
+      const cleanupError = await cleanupUnusedImages(newImageUrlsPendingCleanup.filter(url => url !== nextImageUrl))
       setCategories([...categories, data].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
       setIsAdding(false)
       setNewName('')
       setNewSort(0)
       setNewImageUrl(null)
+      setNewImageUrlsPendingCleanup([])
+      setStatusMessage(cleanupError
+        ? 'تمت إضافة القسم بنجاح، لكن تعذر حذف صورة قديمة من التخزين: ' + cleanupError
+        : 'تمت إضافة القسم بنجاح')
     }
+    setAddingSaving(false)
   }
 
   async function handleUpdate(id: string) {
     if (!editName.trim()) return
+    setSavingCategoryId(id)
+    setStatusMessage('')
 
+    const nextImageUrl = editImageUrl?.trim() || null
     const { error } = await supabase
       .from('categories')
-      .update({ name: editName, sort_order: editSort, image_url: editImageUrl })
+      .update({ name: editName, sort_order: editSort, image_url: nextImageUrl })
       .eq('id', id)
 
     if (error) {
-      alert('حدث خطأ أثناء التحديث: ' + error.message)
+      setStatusMessage('حدث خطأ أثناء تحديث القسم: ' + error.message)
       console.error(error)
+      setSavingCategoryId(null)
       return
     }
 
-    setCategories(categories.map(c => c.id === id ? { ...c, name: editName, sort_order: editSort, image_url: editImageUrl } : c).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
+    const cleanupCandidates = [
+      editOriginalImageUrl && editOriginalImageUrl !== nextImageUrl ? editOriginalImageUrl : null,
+      ...editImageUrlsPendingCleanup.filter(url => url !== nextImageUrl),
+    ]
+    const cleanupError = await cleanupUnusedImages(cleanupCandidates)
+
+    setCategories(categories.map(c => c.id === id ? { ...c, name: editName, sort_order: editSort, image_url: nextImageUrl } : c).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
     setIsEditing(null)
+    setEditOriginalImageUrl(null)
+    setEditImageUrlsPendingCleanup([])
+    setSavingCategoryId(null)
+    setStatusMessage(cleanupError
+      ? 'تم حفظ القسم بنجاح، لكن تعذر حذف الصورة القديمة من التخزين: ' + cleanupError
+      : 'تم حفظ القسم بنجاح')
   }
 
   async function handleDelete(id: string) {
     if (!confirm('هل أنت متأكد من حذف هذا القسم؟ سيتم حذف جميع المنتجات التابعة له!')) return
 
+    const categoryToDelete = categories.find(category => category.id === id)
+    const { data: productsInCategory, error: productsError } = await supabase
+      .from('menu_items')
+      .select('image_url')
+      .eq('category_id', id)
+
+    if (productsError) {
+      console.warn('Could not fetch category product images before delete:', productsError.message)
+    }
+
+    const cleanupCandidates = [
+      categoryToDelete?.image_url,
+      ...(productsInCategory || []).map(product => product.image_url),
+    ]
+
     const { error } = await supabase.from('categories').delete().eq('id', id)
     if (!error) {
+      const cleanupError = await cleanupUnusedImages(cleanupCandidates)
       setCategories(categories.filter(c => c.id !== id))
+      if (cleanupError) {
+        setStatusMessage('تم حذف القسم، لكن تعذر حذف بعض الصور من التخزين: ' + cleanupError)
+      } else if (productsError) {
+        setStatusMessage('تم حذف القسم، لكن تعذر فحص صور المنتجات التابعة قبل الحذف: ' + productsError.message)
+      } else {
+        setStatusMessage('تم حذف القسم')
+      }
+    } else {
+      setStatusMessage('حدث خطأ أثناء حذف القسم: ' + error.message)
     }
   }
 
@@ -99,52 +257,65 @@ export default function CategoriesPage() {
     setEditName(c.name)
     setEditSort(c.sort_order || 0)
     setEditImageUrl(c.image_url || null)
+    setEditOriginalImageUrl(c.image_url || null)
+    setEditImageUrlsPendingCleanup([])
   }
 
-  if (loading) return <div>جاري التحميل...</div>
+  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">جاري التحميل...</div>
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">الأقسام</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-brand-text">الأقسام</h1>
+          <p className="text-sm leading-6 text-brand-brown">إدارة أقسام المنيو وصورها وترتيب ظهورها.</p>
+        </div>
         <button
+          type="button"
           onClick={() => setIsAdding(true)}
-          className="bg-brand-burgundy text-white px-4 py-2 rounded-lg hover:bg-brand-burgundy-dark flex items-center gap-2"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-burgundy px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark sm:w-auto"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="h-5 w-5" />
           إضافة قسم
         </button>
       </div>
 
+      {statusMessage && (
+        <div className={`rounded-lg border p-4 text-sm font-bold ${statusMessage.includes('خطأ') ? 'border-red-100 bg-red-50 text-red-700' : statusMessage.includes('تعذر') ? 'border-amber-100 bg-amber-50 text-amber-800' : 'border-green-100 bg-green-50 text-green-700'}`}>
+          {statusMessage}
+        </div>
+      )}
+
       {isAdding && (
-        <form onSubmit={handleAdd} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-4">
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">الاسم</label>
-              <input required type="text" className="w-full px-3 py-2 border rounded-md" value={newName} onChange={e => setNewName(e.target.value)} />
+        <form onSubmit={handleAdd} className="flex flex-col gap-5 rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_8rem]">
+            <div className="min-w-0">
+              <label className="mb-2 block text-sm font-bold text-brand-text">الاسم</label>
+              <input required type="text" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={newName} onChange={e => setNewName(e.target.value)} />
             </div>
-            <div className="w-32">
-              <label className="block text-sm font-medium text-gray-700 mb-1">الترتيب</label>
-              <input type="number" className="w-full px-3 py-2 border rounded-md" value={newSort} onChange={e => setNewSort(parseInt(e.target.value) || 0)} />
+            <div className="min-w-0">
+              <label className="mb-2 block text-sm font-bold text-brand-text">الترتيب</label>
+              <input type="number" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={newSort} onChange={e => setNewSort(parseInt(e.target.value) || 0)} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">صورة القسم</label>
+            <label className="mb-2 block text-sm font-bold text-brand-text">صورة القسم</label>
             <ImageUploader 
               value={newImageUrl} 
-              onChange={setNewImageUrl} 
+              onChange={handleNewImageChange}
+              onClear={clearNewCategoryImage}
               folder="categories"
-              helperText="ستظهر هذه الصورة في الصفحة الرئيسية للأقسام"
+              helperText="ستظهر هذه الصورة في الصفحة الرئيسية للأقسام (المقاس المقترح: 500 × 500 بكسل)"
             />
           </div>
-          <div className="flex gap-2">
-            <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">حفظ</button>
-            <button type="button" onClick={() => setIsAdding(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">إلغاء</button>
+          <div className="grid grid-cols-1 gap-3 sm:flex sm:justify-end">
+            <button type="button" onClick={cancelAdd} className="min-h-11 rounded-xl border border-brand-border bg-white px-4 py-2 text-sm font-bold text-brand-brown hover:bg-brand-cream sm:w-auto">إلغاء</button>
+            <button type="submit" disabled={addingSaving} className="min-h-11 rounded-xl bg-brand-burgundy px-4 py-2 text-sm font-bold text-white hover:bg-brand-burgundy-dark disabled:opacity-50 sm:w-auto">{addingSaving ? 'جاري الحفظ...' : 'حفظ القسم'}</button>
           </div>
         </form>
       )}
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-sm">
         <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -163,7 +334,8 @@ export default function CategoriesPage() {
                       <div className="w-32">
                         <ImageUploader 
                           value={editImageUrl} 
-                          onChange={setEditImageUrl} 
+                          onChange={handleEditImageChange}
+                          onClear={() => clearEditingCategoryImage(category.id)}
                           folder="categories"
                         />
                       </div>
@@ -196,13 +368,13 @@ export default function CategoriesPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     {isEditing === category.id ? (
                       <div className="flex gap-2">
-                        <button onClick={() => handleUpdate(category.id)} className="text-green-600 hover:text-green-900">حفظ</button>
-                        <button onClick={() => setIsEditing(null)} className="text-gray-600 hover:text-gray-900">إلغاء</button>
+                        <button type="button" onClick={() => handleUpdate(category.id)} className="text-green-600 hover:text-green-900">حفظ</button>
+                        <button type="button" onClick={cancelEdit} className="text-gray-600 hover:text-gray-900">إلغاء</button>
                       </div>
                     ) : (
                       <div className="flex gap-4">
-                        <button onClick={() => startEdit(category)} className="text-brand-burgundy hover:text-brand-burgundy-dark"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => handleDelete(category.id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => startEdit(category)} className="text-brand-burgundy hover:text-brand-burgundy-dark"><Edit2 className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => handleDelete(category.id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     )}
                   </td>
@@ -218,29 +390,30 @@ export default function CategoriesPage() {
         </div>
         
         {/* Mobile View */}
-        <div className="block md:hidden divide-y divide-gray-100">
+        <div className="block divide-y divide-brand-border md:hidden">
           {categories.map((category) => (
-            <div key={category.id} className="p-4 flex flex-col gap-4 bg-white hover:bg-gray-50/50 transition-colors">
+            <div key={category.id} className="flex flex-col gap-4 bg-white p-4">
               {isEditing === category.id ? (
                 <div className="flex flex-col gap-3">
                   <div className="w-full">
                     <ImageUploader 
                       value={editImageUrl} 
-                      onChange={setEditImageUrl} 
+                      onChange={handleEditImageChange}
+                      onClear={() => clearEditingCategoryImage(category.id)}
                       folder="categories"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">الاسم</label>
-                    <input type="text" className="w-full px-2 py-2 border rounded text-sm" value={editName} onChange={e => setEditName(e.target.value)} />
+                    <label className="mb-1.5 block text-xs font-bold text-gray-600">الاسم</label>
+                    <input type="text" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={editName} onChange={e => setEditName(e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">الترتيب</label>
-                    <input type="number" className="w-full px-2 py-2 border rounded text-sm" value={editSort} onChange={e => setEditSort(parseInt(e.target.value) || 0)} />
+                    <label className="mb-1.5 block text-xs font-bold text-gray-600">الترتيب</label>
+                    <input type="number" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={editSort} onChange={e => setEditSort(parseInt(e.target.value) || 0)} />
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <button onClick={() => handleUpdate(category.id)} className="bg-green-50 text-green-700 py-2.5 rounded-lg border border-green-200 text-sm font-medium">حفظ</button>
-                    <button onClick={() => setIsEditing(null)} className="bg-gray-100 text-gray-700 py-2.5 rounded-lg border border-gray-200 text-sm font-medium">إلغاء</button>
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <button type="button" disabled={savingCategoryId === category.id} onClick={() => handleUpdate(category.id)} className="min-h-11 rounded-xl bg-brand-burgundy py-3 text-sm font-bold text-white shadow-sm transition-colors disabled:opacity-50">{savingCategoryId === category.id ? 'جاري الحفظ...' : 'حفظ'}</button>
+                    <button type="button" onClick={cancelEdit} className="min-h-11 rounded-xl border border-gray-200 bg-gray-100 py-3 text-sm font-bold text-gray-700 transition-colors">إلغاء</button>
                   </div>
                 </div>
               ) : (
@@ -258,18 +431,18 @@ export default function CategoriesPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-base font-bold text-gray-900 truncate">{category.name}</h3>
+                      <h3 className="break-words text-base font-bold leading-6 text-gray-900">{category.name}</h3>
                       <div className="text-sm text-gray-500 mt-1">الترتيب: {category.sort_order}</div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    <button onClick={() => startEdit(category)} className="flex justify-center items-center gap-2 bg-gray-50 hover:bg-gray-100 text-brand-burgundy py-2.5 rounded-lg border border-gray-200 transition-colors">
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <button type="button" onClick={() => startEdit(category)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-3 text-brand-burgundy shadow-sm transition-colors hover:bg-gray-100">
                       <Edit2 className="w-4 h-4" />
-                      <span className="text-sm font-medium">تعديل</span>
+                      <span className="text-sm font-bold">تعديل</span>
                     </button>
-                    <button onClick={() => handleDelete(category.id)} className="flex justify-center items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 py-2.5 rounded-lg border border-red-100 transition-colors">
+                    <button type="button" onClick={() => handleDelete(category.id)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 py-3 text-red-600 shadow-sm transition-colors hover:bg-red-100">
                       <Trash2 className="w-4 h-4" />
-                      <span className="text-sm font-medium">حذف</span>
+                      <span className="text-sm font-bold">حذف</span>
                     </button>
                   </div>
                 </>
@@ -277,7 +450,7 @@ export default function CategoriesPage() {
             </div>
           ))}
           {categories.length === 0 && (
-            <div className="p-8 text-center text-sm text-gray-500">لا يوجد أقسام</div>
+            <div className="p-8 text-center text-sm text-brand-brown">لا يوجد أقسام حتى الآن.</div>
           )}
         </div>
       </div>

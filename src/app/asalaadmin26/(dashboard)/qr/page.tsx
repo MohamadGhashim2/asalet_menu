@@ -13,13 +13,14 @@ export default function QrPage() {
     setUrl(siteUrl)
   }, [])
 
-  if (!url) return null
+  if (!url) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">جاري تجهيز رمز QR...</div>
 
   return (
-    <div className="max-w-2xl bg-white p-8 rounded-lg shadow-sm border border-gray-100 flex flex-col items-center">
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">رمز الاستجابة السريعة (QR Code) للمنيو</h1>
+    <div className="mx-auto flex w-full max-w-2xl flex-col items-center rounded-xl border border-brand-border bg-white p-5 text-center shadow-sm sm:p-8">
+      <h1 className="text-2xl font-bold text-brand-text">رمز الاستجابة السريعة (QR Code) للمنيو</h1>
+      <p className="mt-2 text-sm leading-6 text-brand-brown">اطبع الرمز وضعه على الطاولات ليصل الزبون إلى المنيو مباشرة.</p>
       
-      <div className="bg-white p-4 border-4 border-gray-100 rounded-xl mb-6">
+      <div className="my-6 max-w-full rounded-xl border-4 border-brand-cream bg-white p-4">
         <QRCode
           value={url}
           size={256}
@@ -27,25 +28,19 @@ export default function QrPage() {
         />
       </div>
 
-      <p className="text-gray-600 mb-4 text-center">
+      <p className="mb-4 text-center text-sm leading-6 text-brand-brown">
         قم بمسح الرمز أعلاه للوصول إلى المنيو الرقمي الخاص بك.<br />
         يمكنك طباعة هذا الرمز ووضعه على الطاولات.
       </p>
 
-      <div className="w-full mt-4 p-3 bg-gray-50 rounded text-center border border-gray-200">
-        <span className="text-sm font-mono text-gray-500 break-all">{url}</span>
+      <div className="mt-4 w-full rounded-lg border border-brand-border bg-brand-cream/60 p-3 text-center">
+        <span className="break-all font-mono text-sm text-brand-brown">{url}</span>
       </div>
       
       <button 
-        onClick={() => {
-          const svg = document.querySelector('svg')
-          if (!svg) return
-          const svgData = new XMLSerializer().serializeToString(svg)
-          const canvas = document.createElement('canvas')
-          const ctx = canvas.getContext('new') // Wait, standard way to download QR code needs a canvas, but for MVP let's just ask them to right click or print
-          window.print()
-        }}
-        className="mt-6 bg-brand-burgundy text-white px-6 py-2 rounded-lg hover:bg-brand-burgundy-dark"
+        type="button"
+        onClick={() => window.print()}
+        className="mt-6 min-h-11 w-full rounded-xl bg-brand-burgundy px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark sm:w-auto"
       >
         طباعة الصفحة
       </button>

@@ -26,6 +26,31 @@ The QR Menu MVP has been implemented as requested.
 - Create an admin user via Supabase Auth dashboard (the email MUST match `NEXT_PUBLIC_ADMIN_LOGIN_EMAIL`, and the password will be the access code).
 - Ensure all product/category images are uploaded via the admin panel. Local menu assets and the import tool have been removed.
 
+## Supabase Storage Image Lifecycle
+- Older product/category image replacements may have left orphaned files in the `menu-images` bucket before the cleanup fix.
+- Future admin product/category image replacement, image clearing, product deletion, and category deletion now attempt to remove unused Supabase Storage objects after the database update/delete succeeds.
+- Cleanup only targets public URLs from this project's `menu-images` bucket. External URLs and legacy `/menu-assets/` paths are ignored.
+- Shared images are protected: before removing a file, the admin UI checks `menu_items.image_url` and `categories.image_url`; if the URL is still referenced, the file is not removed.
+- If Storage deletion fails because of RLS/policy, the admin action still succeeds and shows/logs a warning. The Storage bucket needs an authenticated admin DELETE policy for `menu-images`; do not add a broad public delete policy.
+
+### Audit Orphaned Storage Images
+Run this locally after setting `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_ADMIN_LOGIN_EMAIL`, and either `ADMIN_ACCESS_CODE` or `ADMIN_LOGIN_PASSWORD` in local env:
+
+```bash
+node scripts/audit-storage-orphans.mjs
+```
+
+The audit signs in as the configured admin, recursively lists `menu-images`, compares files against `menu_items.image_url` and `categories.image_url`, and prints orphan paths without deleting anything.
+
+### Delete Orphaned Storage Images
+The delete script refuses to run unless `--confirm` is provided:
+
+```bash
+node scripts/delete-storage-orphans.mjs --confirm
+```
+
+It reuses the audit result, deletes only unreferenced files from `menu-images` in batches, logs each deleted path, and continues safely if an individual delete fails.
+
 ## GitHub Deployment & Production Readiness
 This project is built as a single-client MVP ready for deployment on Vercel:
 1. **Repository Setup**: Initialize Git (`git init`), add the files (`git add .`), commit (`git commit -m "Initial MVP commit"`), and push to a private GitHub repository.

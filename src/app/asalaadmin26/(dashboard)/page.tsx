@@ -9,16 +9,19 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">مرحباً بك في لوحة الإدارة</h1>
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold text-brand-text sm:text-3xl">مرحباً بك في لوحة الإدارة</h1>
+        <p className="text-sm leading-6 text-brand-brown">ملخص سريع لمحتوى المنيو الحالي.</p>
+      </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-          <h3 className="text-lg font-medium text-gray-500">إجمالي الأقسام</h3>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{categoriesCount || 0}</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-xl border border-brand-border bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-bold text-brand-brown">إجمالي الأقسام</h2>
+          <p className="mt-2 text-3xl font-bold text-brand-text">{categoriesCount || 0}</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-          <h3 className="text-lg font-medium text-gray-500">إجمالي المنتجات</h3>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{itemsCount || 0}</p>
+        <div className="rounded-xl border border-brand-border bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-bold text-brand-brown">إجمالي المنتجات</h2>
+          <p className="mt-2 text-3xl font-bold text-brand-text">{itemsCount || 0}</p>
         </div>
       </div>
     </div>

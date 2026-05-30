@@ -39,25 +39,25 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
+    <div className="flex min-h-screen items-center justify-center overflow-x-hidden bg-brand-cream p-4 sm:p-6 lg:p-8">
+      <div className="w-full max-w-md space-y-7 rounded-2xl border border-brand-border bg-white p-5 shadow-sm sm:p-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h1 className="text-center text-2xl font-extrabold text-brand-text sm:text-3xl">
             تسجيل الدخول للإدارة
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          </h1>
+          <p className="mt-2 text-center text-sm leading-6 text-brand-brown">
             أدخل رمز الدخول الخاص بإدارة المنيو
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+        <form className="space-y-5" onSubmit={handleLogin}>
           {error && (
-            <div className="bg-red-50 text-red-500 p-3 rounded-md text-sm text-center">
+            <div className="rounded-lg border border-red-100 bg-red-50 p-3 text-center text-sm font-medium text-red-600">
               {error}
             </div>
           )}
-          <div className="rounded-md shadow-sm space-y-4">
+          <div className="space-y-2">
             <div>
-              <label htmlFor="code" className="sr-only">
+              <label htmlFor="code" className="mb-2 block text-sm font-bold text-brand-text">
                 رمز الدخول
               </label>
               <input
@@ -65,7 +65,7 @@ export default function LoginPage() {
                 name="code"
                 type="password"
                 required
-                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-brand-burgundy/100 focus:border-brand-burgundy/100 focus:z-10 sm:text-sm text-center tracking-widest text-xl"
+                className="relative block min-h-12 w-full appearance-none rounded-xl border border-brand-border px-4 py-3 text-center text-xl tracking-widest text-brand-text outline-none transition-colors placeholder:text-gray-400 focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10"
                 placeholder="رمز الدخول"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
@@ -77,7 +77,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-brand-burgundy hover:bg-brand-burgundy-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-burgundy/100 disabled:opacity-50"
+              className="relative flex min-h-12 w-full justify-center rounded-xl border border-transparent bg-brand-burgundy px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark focus:outline-none focus:ring-2 focus:ring-brand-gold focus:ring-offset-2 disabled:opacity-50"
             >
               {loading ? 'جاري تسجيل الدخول...' : 'دخول'}
             </button>

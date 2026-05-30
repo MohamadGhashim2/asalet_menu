@@ -492,40 +492,40 @@ export default function MenuClient({
                       )}
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {group.options.map(opt => {
                         const isSelected = selections[group.id]?.includes(opt.id)
                         const isSingle = group.selection_type === 'single'
                         return (
-                          <div
+                          <button
                             key={opt.id}
+                            type="button"
                             onClick={() => toggleSelection(group.id, opt.id, group.selection_type || 'single')}
-                            role="button"
-                            className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all active:scale-[0.99] ${isSelected
-                              ? 'border-brand-burgundy bg-brand-burgundy/5'
-                              : 'border-brand-border bg-[#fbf9f7] hover:border-brand-gold/30'
-                              }`}
+                            role={isSingle ? "radio" : undefined}
+                            aria-checked={isSingle ? isSelected : undefined}
+                            aria-pressed={!isSingle ? isSelected : undefined}
+                            className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 active:scale-[0.99] cursor-pointer text-right ${
+                              isSelected
+                                ? 'border-brand-burgundy bg-brand-burgundy/10 shadow-sm'
+                                : 'border-brand-border bg-[#fbf9f7] hover:border-brand-gold/40'
+                            }`}
                           >
                             <div className="flex items-center gap-3">
-                              <div className={`flex items-center justify-center w-5 h-5 border-2 transition-colors ${isSingle ? 'rounded-full' : 'rounded-md'
-                                } ${isSelected ? 'border-brand-burgundy bg-brand-burgundy' : 'border-brand-border bg-[#fbf9f7]'
-                                }`}>
-                                {isSelected && (
-                                  <svg width="10" height="10" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
-                                    <path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
-                                )}
-                              </div>
+                              {isSelected && (
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-brand-burgundy shrink-0 animate-in fade-in zoom-in duration-150">
+                                  <path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
                               <span className={`text-[15px] ${isSelected ? 'font-bold text-brand-burgundy' : 'font-medium text-brand-text'}`}>
                                 {opt.name}
                               </span>
                             </div>
                             {(opt.price || 0) > 0 && (
-                              <span className={`text-[14px] font-bold ${isSelected ? 'text-brand-burgundy' : 'text-brand-brown'}`}>
+                              <span className={`text-[14px] font-bold shrink-0 ${isSelected ? 'text-brand-burgundy' : 'text-brand-gold'}`}>
                                 {group.kind === 'variant' ? '' : '+'}{opt.price} {currency}
                               </span>
                             )}
-                          </div>
+                          </button>
                         )
                       })}
                     </div>

@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut, LayoutDashboard, Settings, List, Package, QrCode, Import, Menu, X, Layers } from 'lucide-react'
+import { LogOut, LayoutDashboard, Settings, List, Package, QrCode, Menu, X, Layers, LayoutGrid } from 'lucide-react'
 
 const navLinks = [
   { href: '/asalaadmin26', label: 'لوحة القيادة', icon: LayoutDashboard },
   { href: '/asalaadmin26/settings', label: 'الإعدادات', icon: Settings },
   { href: '/asalaadmin26/categories', label: 'الأقسام', icon: List },
+  { href: '/asalaadmin26/menu-manager', label: 'إدارة بصرية للمنيو', icon: LayoutGrid },
   { href: '/asalaadmin26/items', label: 'المنتجات', icon: Package },
   { href: '/asalaadmin26/option-templates', label: 'قوالب الإضافات', icon: Layers },
   { href: '/asalaadmin26/qr', label: 'رمز الاستجابة السريعة (QR)', icon: QrCode },
@@ -21,11 +22,12 @@ export default function AdminSidebarClient({ children }: { children: React.React
   const closeSidebar = () => setIsOpen(false)
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-screen w-full max-w-full overflow-hidden bg-brand-cream text-brand-text">
       {/* Desktop Sidebar */}
-      <aside className="w-64 bg-white shadow-md flex-col hidden md:flex z-20">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-800">إدارة المنيو</h2>
+      <aside className="z-20 hidden w-64 shrink-0 flex-col border-l border-brand-border bg-white shadow-sm md:flex">
+        <div className="border-b border-brand-border p-6">
+          <h2 className="text-2xl font-bold text-brand-text">إدارة المنيو</h2>
+          <p className="mt-1 text-sm text-brand-brown">لوحة مطعم أصالة</p>
         </div>
         <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
           {navLinks.map((link) => {
@@ -34,20 +36,20 @@ export default function AdminSidebarClient({ children }: { children: React.React
               <Link 
                 key={link.href} 
                 href={link.href} 
-                className={`flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-lg transition-colors ${
-                  isActive ? 'bg-brand-burgundy/10 text-brand-burgundy font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                className={`flex min-h-11 items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
+                  isActive ? 'bg-brand-burgundy/10 text-brand-burgundy font-semibold' : 'text-brand-brown hover:bg-brand-cream/70'
                 }`}
               >
-                <link.icon className="w-5 h-5" />
-                <span>{link.label}</span>
+                <link.icon className="h-5 w-5 shrink-0" />
+                <span className="min-w-0 leading-6">{link.label}</span>
               </Link>
             )
           })}
         </nav>
-        <div className="p-4 border-t">
+        <div className="border-t border-brand-border p-4">
           <form action="/auth/signout" method="post">
-            <button type="submit" className="flex items-center space-x-3 space-x-reverse px-4 py-2 w-full text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-              <LogOut className="w-5 h-5" />
+            <button type="submit" className="flex min-h-11 w-full items-center gap-3 rounded-lg px-4 py-2 text-red-600 transition-colors hover:bg-red-50">
+              <LogOut className="h-5 w-5 shrink-0" />
               <span>تسجيل الخروج</span>
             </button>
           </form>
@@ -56,7 +58,7 @@ export default function AdminSidebarClient({ children }: { children: React.React
 
       {/* Mobile Overlay & Drawer */}
       {isOpen && (
-        <div className="fixed inset-0 z-40 md:hidden flex">
+        <div className="fixed inset-0 z-50 flex md:hidden">
           {/* Backdrop */}
           <div 
             className="fixed inset-0 bg-black/50 transition-opacity" 
@@ -65,22 +67,22 @@ export default function AdminSidebarClient({ children }: { children: React.React
           />
           
           {/* Drawer */}
-          <aside className="relative flex-1 flex flex-col max-w-xs w-full bg-white shadow-xl h-full transform transition-transform">
-            <div className="absolute top-0 left-0 -ml-12 pt-4">
+          <aside className="relative flex h-full w-[min(86vw,20rem)] max-w-full flex-col overflow-hidden border-l border-brand-border bg-white shadow-xl">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-brand-border p-4">
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold text-brand-text">إدارة المنيو</h2>
+                <p className="mt-1 text-sm text-brand-brown">لوحة مطعم أصالة</p>
+              </div>
               <button
                 type="button"
-                className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand-border bg-brand-cream text-brand-text transition-colors hover:bg-brand-beige focus:outline-none focus:ring-2 focus:ring-brand-gold"
                 onClick={closeSidebar}
               >
                 <span className="sr-only">إغلاق القائمة</span>
-                <X className="h-6 w-6 text-white" aria-hidden="true" />
+                <X className="h-6 w-6" aria-hidden="true" />
               </button>
             </div>
-            
-            <div className="p-6 flex-shrink-0">
-              <h2 className="text-2xl font-bold text-gray-800">إدارة المنيو</h2>
-            </div>
-            <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
+            <nav className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href
                 return (
@@ -88,20 +90,20 @@ export default function AdminSidebarClient({ children }: { children: React.React
                     key={link.href} 
                     href={link.href} 
                     onClick={closeSidebar}
-                    className={`flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-lg transition-colors ${
-                      isActive ? 'bg-brand-burgundy/10 text-brand-burgundy font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                    className={`flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 transition-colors ${
+                      isActive ? 'bg-brand-burgundy/10 text-brand-burgundy font-semibold' : 'text-brand-brown hover:bg-brand-cream/70'
                     }`}
                   >
-                    <link.icon className="w-5 h-5" />
-                    <span>{link.label}</span>
+                    <link.icon className="h-5 w-5 shrink-0" />
+                    <span className="min-w-0 leading-6">{link.label}</span>
                   </Link>
                 )
               })}
             </nav>
-            <div className="p-4 border-t flex-shrink-0">
+            <div className="shrink-0 border-t border-brand-border p-4">
               <form action="/auth/signout" method="post">
-                <button type="submit" className="flex items-center space-x-3 space-x-reverse px-4 py-2 w-full text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                  <LogOut className="w-5 h-5" />
+                <button type="submit" className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 py-2 text-red-600 transition-colors hover:bg-red-50">
+                  <LogOut className="h-5 w-5 shrink-0" />
                   <span>تسجيل الخروج</span>
                 </button>
               </form>
@@ -111,28 +113,29 @@ export default function AdminSidebarClient({ children }: { children: React.React
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile Topbar */}
-        <div className="md:hidden bg-white shadow-sm p-4 flex justify-between items-center z-10 shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="sticky top-0 z-30 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-3 shadow-sm md:hidden">
+          <div className="flex min-w-0 items-center gap-3">
             <button
+              type="button"
               onClick={() => setIsOpen(true)}
-              className="text-gray-600 hover:text-gray-900 focus:outline-none p-1 -ml-1 rounded-md"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-brand-text transition-colors hover:bg-brand-cream focus:outline-none focus:ring-2 focus:ring-brand-gold"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="h-6 w-6" />
             </button>
-            <h2 className="text-xl font-bold text-gray-800">إدارة المنيو</h2>
+            <h2 className="min-w-0 truncate text-lg font-bold text-brand-text">إدارة المنيو</h2>
           </div>
           <form action="/auth/signout" method="post">
-            <button type="submit" className="text-red-600 p-1">
-              <LogOut className="w-6 h-6" />
+            <button type="submit" className="flex h-11 w-11 items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50">
+              <LogOut className="h-6 w-6" />
             </button>
           </form>
         </div>
         
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-4 md:p-6">
+          <div className="mx-auto w-full max-w-7xl min-w-0">
             {children}
           </div>
         </div>
