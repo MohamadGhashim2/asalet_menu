@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Database } from '@/types/supabase'
 import { ChevronRight, Info, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
@@ -30,6 +30,42 @@ type CartItem = {
   total: number
 }
 
+type MenuUrlState = {
+  categoryId?: string | null
+  productId?: string | null
+  cartOpen?: boolean
+}
+
+type MenuHistoryView = 'categories' | 'category' | 'product' | 'cart'
+
+const buildInitialSelections = (item: MenuItem) => {
+  const initialSelections: Record<string, string[]> = {}
+
+  item.groups.forEach(group => {
+    if (group.selection_type === 'single' && group.options.length > 0) {
+      const defaultOption = group.options.find(option => option.is_default)
+      initialSelections[group.id] = defaultOption ? [defaultOption.id] : []
+    } else {
+      initialSelections[group.id] = group.options.filter(option => option.is_default).map(option => option.id)
+    }
+  })
+
+  return initialSelections
+}
+
+const buildMenuUrl = (href: string, state: MenuUrlState) => {
+  const url = new URL(href)
+  url.searchParams.delete('category')
+  url.searchParams.delete('product')
+  url.searchParams.delete('cart')
+
+  if (state.categoryId) url.searchParams.set('category', state.categoryId)
+  if (state.productId) url.searchParams.set('product', state.productId)
+  if (state.cartOpen) url.searchParams.set('cart', '1')
+
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
 export default function MenuClient({
   settings,
   categories,
@@ -47,19 +83,17 @@ export default function MenuClient({
 
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
-  const selectedItemRef = useRef<MenuItem | null>(null)
-  const isCartOpenRef = useRef(false)
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const currency = settings?.currency || 'ر.س'
 
   // Client-side sort fallback for items (sort_order then created_at)
-  const sortedItems = [...items].sort((a, b) => {
-    const sortA = a.sort_order ?? 0;
-    const sortB = b.sort_order ?? 0;
-    if (sortA !== sortB) return sortA - sortB;
-    return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime();
-  });
+  const sortedItems = useMemo(() => [...items].sort((a, b) => {
+    const sortA = a.sort_order ?? 0
+    const sortB = b.sort_order ?? 0
+    if (sortA !== sortB) return sortA - sortB
+    return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
+  }), [items])
 
   const getValidImageUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
@@ -73,33 +107,81 @@ export default function MenuClient({
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [activeCategoryView])
 
-  const openCategory = (id: string) => {
+  const updateMenuUrl = (mode: 'push' | 'replace', state: MenuUrlState, view: MenuHistoryView) => {
+    if (typeof window === 'undefined') return
+
+    const nextUrl = buildMenuUrl(window.location.href, state)
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    if (nextUrl === currentUrl) return
+
+    const historyState = { ...window.history.state, asaletMenuView: view }
+    if (mode === 'push') {
+      window.history.pushState(historyState, '', nextUrl)
+    } else {
+      window.history.replaceState(historyState, '', nextUrl)
+    }
+  }
+
+  const openCategory = (id: string, mode: 'push' | 'replace' = 'push') => {
     setActiveCategoryView(id)
+    setSelectedItem(null)
+    setIsCartOpen(false)
+    updateMenuUrl(mode, { categoryId: id }, 'category')
+  }
+
+  const closeCategoryView = () => {
+    if (typeof window !== 'undefined' && window.history.state?.asaletMenuView === 'category') {
+      window.history.back()
+      return
+    }
+
+    setActiveCategoryView(null)
+    setSelectedItem(null)
+    setIsCartOpen(false)
+    updateMenuUrl('replace', {}, 'categories')
   }
 
   useEffect(() => {
-    selectedItemRef.current = selectedItem
-  }, [selectedItem])
+    const synchronizeMenuFromUrl = () => {
+      const url = new URL(window.location.href)
+      const categoryId = url.searchParams.get('category')
+      const productId = url.searchParams.get('product')
+      const cartOpen = url.searchParams.get('cart') === '1'
+      const validCategory = categoryId ? categories.find(category => category.id === categoryId) : null
+      const validItem = productId ? sortedItems.find(item => item.id === productId) : null
+      const hasInvalidCategory = Boolean(categoryId && !validCategory)
+      const hasInvalidProduct = Boolean(productId && (!validItem || (categoryId && validItem.category_id !== categoryId)))
 
-  useEffect(() => {
-    isCartOpenRef.current = isCartOpen
-  }, [isCartOpen])
-
-  useEffect(() => {
-    const handlePopState = () => {
-      if (selectedItemRef.current) {
+      if (hasInvalidCategory || hasInvalidProduct) {
+        setActiveCategoryView(null)
         setSelectedItem(null)
+        setIsCartOpen(false)
+        window.history.replaceState(
+          { ...window.history.state, asaletMenuView: 'categories' },
+          '',
+          buildMenuUrl(window.location.href, {})
+        )
         return
       }
 
-      if (isCartOpenRef.current) {
+      setActiveCategoryView(categoryId)
+
+      if (validItem) {
+        setProductQuantity(1)
+        setSelections(buildInitialSelections(validItem))
+        setSelectedItem(validItem)
         setIsCartOpen(false)
+        return
       }
+
+      setSelectedItem(null)
+      setIsCartOpen(cartOpen)
     }
 
-    window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
-  }, [])
+    synchronizeMenuFromUrl()
+    window.addEventListener('popstate', synchronizeMenuFromUrl)
+    return () => window.removeEventListener('popstate', synchronizeMenuFromUrl)
+  }, [categories, sortedItems])
 
   useEffect(() => {
     if (!selectedItem && !isCartOpen) return
@@ -120,55 +202,37 @@ export default function MenuClient({
     }
   }, [])
 
-  const pushOverlayHistory = (modal: 'product' | 'cart', productId?: string) => {
-    if (typeof window === 'undefined') return
-    if (window.history.state?.asaletModal === modal) return
-
-    window.history.pushState(
-      { asaletModal: modal, productId },
-      '',
-      window.location.href
-    )
-  }
-
   const closeProductSheet = () => {
-    if (typeof window !== 'undefined' && window.history.state?.asaletModal === 'product') {
+    if (typeof window !== 'undefined' && window.history.state?.asaletMenuView === 'product') {
       window.history.back()
       return
     }
 
     setSelectedItem(null)
+    updateMenuUrl('replace', { categoryId: activeCategoryView }, activeCategoryView ? 'category' : 'categories')
   }
 
   const closeCartSheet = () => {
-    if (typeof window !== 'undefined' && window.history.state?.asaletModal === 'cart') {
+    if (typeof window !== 'undefined' && window.history.state?.asaletMenuView === 'cart') {
       window.history.back()
       return
     }
 
     setIsCartOpen(false)
+    updateMenuUrl('replace', { categoryId: activeCategoryView }, activeCategoryView ? 'category' : 'categories')
   }
 
   const openCartSheet = () => {
     if (isCartOpen) return
     setIsCartOpen(true)
-    pushOverlayHistory('cart')
+    updateMenuUrl('push', { categoryId: activeCategoryView, cartOpen: true }, 'cart')
   }
 
   const openItem = (item: MenuItem) => {
     setProductQuantity(1)
     setSelectedItem(item)
-    const initialSelections: Record<string, string[]> = {}
-    item.groups.forEach(group => {
-      if (group.selection_type === 'single' && group.options.length > 0) {
-        const def = group.options.find(o => o.is_default)
-        initialSelections[group.id] = def ? [def.id] : []
-      } else {
-        initialSelections[group.id] = group.options.filter(o => o.is_default).map(o => o.id)
-      }
-    })
-    setSelections(initialSelections)
-    pushOverlayHistory('product', item.id)
+    setSelections(buildInitialSelections(item))
+    updateMenuUrl('push', { categoryId: activeCategoryView, productId: item.id }, 'product')
   }
 
   const toggleSelection = (groupId: string, optionId: string, selectionType: string) => {
@@ -232,10 +296,7 @@ export default function MenuClient({
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current)
     feedbackTimeoutRef.current = setTimeout(() => setCartFeedback(''), 2200)
 
-    setSelectedItem(null)
-    if (typeof window !== 'undefined' && window.history.state?.asaletModal === 'product') {
-      window.history.back()
-    }
+    closeProductSheet()
   }
 
   const removeFromCart = (cartItemId: string) => {
@@ -430,7 +491,7 @@ export default function MenuClient({
             <div className="sticky top-0 z-20 bg-[#fbf9f7]/95 backdrop-blur-md border-b border-brand-border shadow-sm pt-2 pb-2">
               <div className="flex items-center px-4 gap-3">
                 <button
-                  onClick={() => setActiveCategoryView(null)}
+                  onClick={closeCategoryView}
                   className="w-10 h-10 shrink-0 bg-[#fbf9f7] shadow-sm border border-brand-border rounded-full flex items-center justify-center hover:bg-brand-beige active:scale-90 transition-all text-brand-burgundy"
                   aria-label="العودة للأقسام"
                 >
@@ -441,7 +502,7 @@ export default function MenuClient({
                   {categories.map(cat => (
                     <button
                       key={cat.id}
-                      onClick={() => setActiveCategoryView(cat.id)}
+                      onClick={() => openCategory(cat.id, 'replace')}
                       className={`shrink-0 px-5 py-2 rounded-full text-[14px] font-bold snap-center transition-all duration-200 border ${activeCategoryView === cat.id
                         ? 'bg-brand-burgundy text-brand-cream border-brand-burgundy shadow-sm'
                         : 'bg-brand-beige text-brand-burgundy border-transparent shadow-sm'
@@ -715,6 +776,7 @@ export default function MenuClient({
                 <button
                   onClick={closeCartSheet}
                   className="bg-brand-cream text-brand-burgundy border border-brand-border/50 w-9 h-9 rounded-full flex items-center justify-center hover:bg-brand-beige transition-colors"
+                  aria-label="إغلاق السلة"
                 >
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
