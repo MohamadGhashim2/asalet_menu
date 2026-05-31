@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { uploadMenuImage } from '@/lib/admin-image-upload'
 import { UploadCloud, Loader2, X } from 'lucide-react'
 
 interface ImageUploaderProps {
@@ -20,81 +21,12 @@ export default function ImageUploader({ value, onChange, onClear, folder = 'item
 
   const supabase = createClient()
 
-  const compressImage = async (file: File): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new window.Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const size = 1200;
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            resolve(file);
-            return;
-          }
-
-          // Fill background with brand cream color
-          ctx.fillStyle = '#fbf9f7';
-          ctx.fillRect(0, 0, size, size);
-
-          // Calculate aspect ratio to contain
-          const scale = Math.min(size / img.width, size / img.height);
-          const x = (size - img.width * scale) / 2;
-          const y = (size - img.height * scale) / 2;
-
-          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const newName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
-              resolve(new File([blob], newName, { type: 'image/webp' }));
-            } else {
-              resolve(file);
-            }
-          }, 'image/webp', 0.9);
-        };
-        img.onerror = () => reject(new Error('فشل تحميل الصورة'));
-        img.src = e.target?.result as string;
-      };
-      reader.onerror = () => reject(new Error('فشل قراءة الملف'));
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleUpload = async (rawFile: File) => {
     try {
       setError(null)
       setIsUploading(true)
 
-      // Validation
-      if (!rawFile.type.startsWith('image/')) {
-        throw new Error('الرجاء رفع ملف صورة صالح')
-      }
-      if (rawFile.size > 5 * 1024 * 1024) {
-        throw new Error('حجم الصورة يجب أن لا يتجاوز 5 ميجابايت')
-      }
-
-      // Compress
-      const file = await compressImage(rawFile);
-
-      // Upload to Supabase Storage
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`
-      const filePath = `${folder}/${fileName}`
-
-      const { data, error: uploadError } = await supabase.storage
-        .from('menu-images')
-        .upload(filePath, file, { upsert: false })
-
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('menu-images')
-        .getPublicUrl(data.path)
-
+      const publicUrl = await uploadMenuImage(supabase, rawFile, folder)
       onChange(publicUrl)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'حدث خطأ أثناء رفع الصورة'
@@ -186,6 +118,7 @@ export default function ImageUploader({ value, onChange, onClear, folder = 'item
           <div className="mt-3 space-y-1 text-xs leading-5 text-gray-500">
             <p>المقاس المقترح: 1200 × 1200 بكسل</p>
             <p>يفضل رفع صورة مربعة وواضحة</p>
+            <p>سيتم ضغط الصورة وتحويلها إلى WebP قبل الرفع</p>
             {helperText && <p className="font-bold text-brand-burgundy">{helperText}</p>}
           </div>
         </div>

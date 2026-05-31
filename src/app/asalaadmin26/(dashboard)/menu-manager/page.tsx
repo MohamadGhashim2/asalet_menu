@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowDown,
   ArrowUp,
+  Camera,
   ChevronRight,
   Edit2,
   GripVertical,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/supabase'
+import { uploadMenuImage } from '@/lib/admin-image-upload'
 import { deleteMenuImageIfUnused, deleteMenuImagesIfUnused } from '@/lib/storage-images'
 
 type Category = Database['public']['Tables']['categories']['Row']
@@ -30,6 +32,13 @@ type DragState = {
   kind: DragKind
   id: string
 }
+
+type ImageReplacementTarget = {
+  kind: 'category' | 'product'
+  id: string
+}
+
+const getImageReplacementKey = (target: ImageReplacementTarget) => `${target.kind}:${target.id}`
 
 const compareByMenuOrder = <T extends { sort_order: number | null; created_at: string | null }>(a: T, b: T) => {
   const sortA = a.sort_order ?? 0
@@ -133,6 +142,11 @@ export default function MenuManagerPage() {
   const [savingProducts, setSavingProducts] = useState(false)
   const [savingFeatured, setSavingFeatured] = useState(false)
   const [workingId, setWorkingId] = useState<string | null>(null)
+  const [imageReplacementTarget, setImageReplacementTarget] = useState<ImageReplacementTarget | null>(null)
+  const [uploadingImageKey, setUploadingImageKey] = useState<string | null>(null)
+  const [imagePreviewByKey, setImagePreviewByKey] = useState<Record<string, string>>({})
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const imagePreviewUrlsRef = useRef(new Set<string>())
   const lastDragOverIdRef = useRef<string | null>(null)
 
   const hasUnsavedChanges = categoriesDirty || featuredDirty || dirtyProductCategoryIds.size > 0
@@ -196,6 +210,16 @@ export default function MenuManagerPage() {
     window.addEventListener('beforeunload', warnBeforeUnload)
     return () => window.removeEventListener('beforeunload', warnBeforeUnload)
   }, [hasUnsavedChanges])
+
+  useEffect(() => {
+    const previewUrls = imagePreviewUrlsRef.current
+
+    return () => {
+      for (const previewUrl of previewUrls) {
+        URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!dragging) return
@@ -330,6 +354,102 @@ export default function MenuManagerPage() {
   function backToCategories() {
     if (!confirmUnsavedNavigation()) return
     setSelectedCategoryId(null)
+  }
+
+  function clearImagePreview(key: string) {
+    setImagePreviewByKey(current => {
+      const previewUrl = current[key]
+      if (!previewUrl) return current
+
+      URL.revokeObjectURL(previewUrl)
+      imagePreviewUrlsRef.current.delete(previewUrl)
+
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }
+
+  function openImagePicker(target: ImageReplacementTarget) {
+    if (uploadingImageKey) return
+
+    setImageReplacementTarget(target)
+    if (imageInputRef.current) {
+      imageInputRef.current.value = ''
+      imageInputRef.current.click()
+    }
+  }
+
+  async function replaceImage(target: ImageReplacementTarget, file: File) {
+    const key = getImageReplacementKey(target)
+    const previousImageUrl = target.kind === 'category'
+      ? categories.find(category => category.id === target.id)?.image_url
+      : items.find(item => item.id === target.id)?.image_url
+
+    const previewUrl = URL.createObjectURL(file)
+    imagePreviewUrlsRef.current.add(previewUrl)
+    setImagePreviewByKey(current => ({ ...current, [key]: previewUrl }))
+    setUploadingImageKey(key)
+    setStatusMessage({ type: 'warning', text: 'جاري رفع الصورة...' })
+
+    try {
+      const publicUrl = await uploadMenuImage(
+        supabase,
+        file,
+        target.kind === 'category' ? 'categories' : 'items'
+      )
+
+      const updateResult = target.kind === 'category'
+        ? await supabase.from('categories').update({ image_url: publicUrl }).eq('id', target.id)
+        : await supabase.from('menu_items').update({ image_url: publicUrl }).eq('id', target.id)
+
+      if (updateResult.error) {
+        const cleanupResult = await deleteMenuImageIfUnused(supabase, publicUrl)
+        if (cleanupResult.error) {
+          console.warn('Storage cleanup failed after image update error:', cleanupResult.error)
+        }
+
+        throw new Error(updateResult.error.message)
+      }
+
+      if (target.kind === 'category') {
+        setCategories(current => current.map(category => (
+          category.id === target.id ? { ...category, image_url: publicUrl } : category
+        )))
+      } else {
+        setItems(current => current.map(item => (
+          item.id === target.id ? { ...item, image_url: publicUrl } : item
+        )))
+      }
+
+      const cleanupResult = await deleteMenuImageIfUnused(supabase, previousImageUrl)
+      if (cleanupResult.error) {
+        console.warn('Storage cleanup failed after image replacement:', cleanupResult.error)
+        setStatusMessage({
+          type: 'warning',
+          text: 'تم تحديث الصورة، لكن تعذر حذف الصورة القديمة من التخزين: ' + cleanupResult.error,
+        })
+      } else {
+        setStatusMessage({ type: 'success', text: 'تم تحديث الصورة' })
+      }
+    } catch (error) {
+      setStatusMessage({
+        type: 'error',
+        text: 'فشل رفع الصورة: ' + (error instanceof Error ? error.message : 'حدث خطأ غير متوقع'),
+      })
+    } finally {
+      clearImagePreview(key)
+      setUploadingImageKey(null)
+      setImageReplacementTarget(null)
+    }
+  }
+
+  function handleImageFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file || !imageReplacementTarget) return
+    void replaceImage(imageReplacementTarget, file)
   }
 
   function startHandleDrag(kind: DragKind, id: string, event: React.PointerEvent<HTMLButtonElement>) {
@@ -555,14 +675,30 @@ export default function MenuManagerPage() {
         )}
       </header>
 
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageFileChange}
+      />
+
+      <div className="flex items-start gap-3 rounded-xl border border-brand-border bg-brand-cream/60 p-4 text-sm leading-6 text-brand-brown">
+        <ImageIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand-gold" />
+        <div>
+          <p className="font-bold text-brand-text">المقاس المقترح: 1200 × 1200 بكسل</p>
+          <p>يفضل رفع صورة مربعة وواضحة</p>
+          <p>سيتم ضغط الصورة وتحويلها إلى WebP قبل الرفع</p>
+        </div>
+      </div>
+
       {statusMessage && (
-        <div className={`rounded-xl border p-4 text-sm font-bold ${
-          statusMessage.type === 'error'
+        <div className={`rounded-xl border p-4 text-sm font-bold ${statusMessage.type === 'error'
             ? 'border-red-100 bg-red-50 text-red-700'
             : statusMessage.type === 'warning'
               ? 'border-amber-100 bg-amber-50 text-amber-800'
               : 'border-green-100 bg-green-50 text-green-700'
-        }`}>
+          }`}>
           {statusMessage.text}
         </div>
       )}
@@ -601,9 +737,8 @@ export default function MenuManagerPage() {
                   key={item.id}
                   data-reorder-kind="featured"
                   data-reorder-id={item.id}
-                  className={`w-[168px] shrink-0 overflow-hidden rounded-2xl border bg-[#fbf9f7] shadow-sm transition-opacity ${
-                    dragging?.kind === 'featured' && dragging.id === item.id ? 'opacity-60' : 'border-brand-border'
-                  }`}
+                  className={`w-[168px] shrink-0 overflow-hidden rounded-2xl border bg-[#fbf9f7] shadow-sm transition-opacity ${dragging?.kind === 'featured' && dragging.id === item.id ? 'opacity-60' : 'border-brand-border'
+                    }`}
                 >
                   <div className="relative aspect-square bg-brand-cream">
                     {getValidImageUrl(item.image_url) ? (
@@ -683,7 +818,8 @@ export default function MenuManagerPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {categories.map((category, index) => {
-                const categoryImage = getCategoryImage(category)
+                const imageKey = getImageReplacementKey({ kind: 'category', id: category.id })
+                const categoryImage = imagePreviewByKey[imageKey] || getCategoryImage(category)
                 const productCount = productCounts.get(category.id) || 0
 
                 return (
@@ -691,9 +827,8 @@ export default function MenuManagerPage() {
                     key={category.id}
                     data-reorder-kind="category"
                     data-reorder-id={category.id}
-                    className={`min-w-0 overflow-hidden rounded-2xl border bg-[#fbf9f7] shadow-sm transition-opacity ${
-                      dragging?.kind === 'category' && dragging.id === category.id ? 'opacity-60' : 'border-brand-border'
-                    }`}
+                    className={`min-w-0 overflow-hidden rounded-2xl border bg-[#fbf9f7] shadow-sm transition-opacity ${dragging?.kind === 'category' && dragging.id === category.id ? 'opacity-60' : 'border-brand-border'
+                      }`}
                   >
                     <button type="button" onClick={() => selectCategory(category.id)} className="block w-full text-right">
                       <div className="relative aspect-[4/3] bg-brand-cream">
@@ -710,26 +845,37 @@ export default function MenuManagerPage() {
                       </div>
                     </button>
 
-                    <div className="grid grid-cols-5 gap-2 border-t border-brand-border bg-white p-3">
-                      <button type="button" onClick={() => moveCategoryStep(category.id, -1)} disabled={index === 0} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-brown disabled:opacity-35">
-                        <ArrowUp className="h-4 w-4" />
-                      </button>
+                    <div className="space-y-2 border-t border-brand-border bg-white p-3">
+                      <div className="grid grid-cols-5 gap-2">
+                        <button type="button" onClick={() => moveCategoryStep(category.id, -1)} disabled={index === 0} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-brown disabled:opacity-35">
+                          <ArrowUp className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onPointerDown={(event) => startHandleDrag('category', category.id, event)}
+                          className="flex min-h-10 touch-none items-center justify-center rounded-lg border border-brand-border bg-brand-cream text-brand-burgundy active:cursor-grabbing"
+                          aria-label="سحب لترتيب القسم"
+                        >
+                          <GripVertical className="h-5 w-5" />
+                        </button>
+                        <button type="button" onClick={() => moveCategoryStep(category.id, 1)} disabled={index === categories.length - 1} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-brown disabled:opacity-35">
+                          <ArrowDown className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => navigateTo('/asalaadmin26/categories')} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-burgundy">
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => deleteCategory(category)} disabled={workingId === category.id} className="flex min-h-10 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 disabled:opacity-60">
+                          {workingId === category.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        onPointerDown={(event) => startHandleDrag('category', category.id, event)}
-                        className="flex min-h-10 touch-none items-center justify-center rounded-lg border border-brand-border bg-brand-cream text-brand-burgundy active:cursor-grabbing"
-                        aria-label="سحب لترتيب القسم"
+                        onClick={() => openImagePicker({ kind: 'category', id: category.id })}
+                        disabled={uploadingImageKey !== null}
+                        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-brand-border bg-brand-cream px-3 py-2 text-sm font-bold text-brand-burgundy transition-colors hover:bg-brand-beige disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <GripVertical className="h-5 w-5" />
-                      </button>
-                      <button type="button" onClick={() => moveCategoryStep(category.id, 1)} disabled={index === categories.length - 1} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-brown disabled:opacity-35">
-                        <ArrowDown className="h-4 w-4" />
-                      </button>
-                      <button type="button" onClick={() => navigateTo('/asalaadmin26/categories')} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-burgundy">
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button type="button" onClick={() => deleteCategory(category)} disabled={workingId === category.id} className="flex min-h-10 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 disabled:opacity-60">
-                        {workingId === category.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        {uploadingImageKey === imageKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                        {uploadingImageKey === imageKey ? 'جاري رفع الصورة...' : 'الصورة'}
                       </button>
                     </div>
                   </article>
@@ -774,51 +920,65 @@ export default function MenuManagerPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {selectedCategoryItems.map((item, index) => (
-                <article
-                  key={item.id}
-                  data-reorder-kind="product"
-                  data-reorder-id={item.id}
-                  className={`min-w-0 overflow-hidden rounded-2xl border bg-[#fbf9f7] shadow-sm transition-opacity ${
-                    dragging?.kind === 'product' && dragging.id === item.id ? 'opacity-60' : 'border-brand-border'
-                  }`}
-                >
-                  <div className="relative aspect-square bg-brand-cream">
-                    {getValidImageUrl(item.image_url) ? <SafeAdminImage src={getValidImageUrl(item.image_url)!} alt={item.name} /> : <EmptyImage />}
-                    <span className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ${
-                      item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {item.is_available ? 'متاح' : 'غير متاح'}
-                    </span>
-                  </div>
-                  <div className="space-y-2 p-4">
-                    <h3 className="line-clamp-2 min-h-[3.5rem] break-words text-base font-bold leading-7 text-brand-text">{item.name}</h3>
-                    <p className="text-sm font-black text-brand-gold">{formatPrice(item, currency)}</p>
-                  </div>
-                  <div className="grid grid-cols-5 gap-2 border-t border-brand-border bg-white p-3">
-                    <button type="button" onClick={() => moveProductStep(item.id, -1)} disabled={index === 0} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-brown disabled:opacity-35">
-                      <ArrowUp className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onPointerDown={(event) => startHandleDrag('product', item.id, event)}
-                      className="flex min-h-10 touch-none items-center justify-center rounded-lg border border-brand-border bg-brand-cream text-brand-burgundy active:cursor-grabbing"
-                      aria-label="سحب لترتيب المنتج"
-                    >
-                      <GripVertical className="h-5 w-5" />
-                    </button>
-                    <button type="button" onClick={() => moveProductStep(item.id, 1)} disabled={index === selectedCategoryItems.length - 1} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-brown disabled:opacity-35">
-                      <ArrowDown className="h-4 w-4" />
-                    </button>
-                    <button type="button" onClick={() => navigateTo(`/asalaadmin26/items/${item.id}`)} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-burgundy">
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button type="button" onClick={() => deleteProduct(item)} disabled={workingId === item.id} className="flex min-h-10 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 disabled:opacity-60">
-                      {workingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </article>
-              ))}
+              {selectedCategoryItems.map((item, index) => {
+                const imageKey = getImageReplacementKey({ kind: 'product', id: item.id })
+                const itemImage = imagePreviewByKey[imageKey] || getValidImageUrl(item.image_url)
+
+                return (
+                  <article
+                    key={item.id}
+                    data-reorder-kind="product"
+                    data-reorder-id={item.id}
+                    className={`min-w-0 overflow-hidden rounded-2xl border bg-[#fbf9f7] shadow-sm transition-opacity ${dragging?.kind === 'product' && dragging.id === item.id ? 'opacity-60' : 'border-brand-border'
+                      }`}
+                  >
+                    <div className="relative aspect-square bg-brand-cream">
+                      {itemImage ? <SafeAdminImage src={itemImage} alt={item.name} /> : <EmptyImage />}
+                      <span className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'
+                        }`}>
+                        {item.is_available ? 'متاح' : 'غير متاح'}
+                      </span>
+                    </div>
+                    <div className="space-y-2 p-4">
+                      <h3 className="line-clamp-2 min-h-[3.5rem] break-words text-base font-bold leading-7 text-brand-text">{item.name}</h3>
+                      <p className="text-sm font-black text-brand-gold">{formatPrice(item, currency)}</p>
+                    </div>
+                    <div className="space-y-2 border-t border-brand-border bg-white p-3">
+                      <div className="grid grid-cols-5 gap-2">
+                        <button type="button" onClick={() => moveProductStep(item.id, -1)} disabled={index === 0} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-brown disabled:opacity-35">
+                          <ArrowUp className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onPointerDown={(event) => startHandleDrag('product', item.id, event)}
+                          className="flex min-h-10 touch-none items-center justify-center rounded-lg border border-brand-border bg-brand-cream text-brand-burgundy active:cursor-grabbing"
+                          aria-label="سحب لترتيب المنتج"
+                        >
+                          <GripVertical className="h-5 w-5" />
+                        </button>
+                        <button type="button" onClick={() => moveProductStep(item.id, 1)} disabled={index === selectedCategoryItems.length - 1} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-brown disabled:opacity-35">
+                          <ArrowDown className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => navigateTo(`/asalaadmin26/items/${item.id}`)} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-burgundy">
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => deleteProduct(item)} disabled={workingId === item.id} className="flex min-h-10 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 disabled:opacity-60">
+                          {workingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openImagePicker({ kind: 'product', id: item.id })}
+                        disabled={uploadingImageKey !== null}
+                        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-brand-border bg-brand-cream px-3 py-2 text-sm font-bold text-brand-burgundy transition-colors hover:bg-brand-beige disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {uploadingImageKey === imageKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                        {uploadingImageKey === imageKey ? 'جاري رفع الصورة...' : 'الصورة'}
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
             </div>
           )}
         </section>

@@ -463,8 +463,9 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
         <section className="rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 space-y-1">
             <h2 className="text-xl font-bold text-brand-text">صورة المنتج</h2>
-            <p className="text-sm leading-6 text-brand-brown">المقاس المقترح: 500 × 500 بكسل</p>
+            <p className="text-sm leading-6 text-brand-brown">المقاس المقترح: 1200 × 1200 بكسل</p>
             <p className="text-sm leading-6 text-brand-brown">يفضل رفع صورة مربعة وواضحة</p>
+            <p className="text-sm leading-6 text-brand-brown">سيتم ضغط الصورة وتحويلها إلى WebP قبل الرفع</p>
           </div>
           <div>
             <ImageUploader 

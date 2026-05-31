@@ -23,12 +23,12 @@ export default function CategoriesPage() {
   const [addingSaving, setAddingSaving] = useState(false)
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState('')
-  
+
   const [editImageUrl, setEditImageUrl] = useState<string | null>(null)
   const [editOriginalImageUrl, setEditOriginalImageUrl] = useState<string | null>(null)
   const [newImageUrlsPendingCleanup, setNewImageUrlsPendingCleanup] = useState<string[]>([])
   const [editImageUrlsPendingCleanup, setEditImageUrlsPendingCleanup] = useState<string[]>([])
-  
+
   const supabase = createClient()
 
   async function fetchCategories() {
@@ -37,7 +37,7 @@ export default function CategoriesPage() {
       .from('categories')
       .select('*')
       .order('sort_order', { ascending: true })
-    
+
     if (data) setCategories(data)
     setLoading(false)
   }
@@ -300,12 +300,12 @@ export default function CategoriesPage() {
           </div>
           <div>
             <label className="mb-2 block text-sm font-bold text-brand-text">صورة القسم</label>
-            <ImageUploader 
-              value={newImageUrl} 
+            <ImageUploader
+              value={newImageUrl}
               onChange={handleNewImageChange}
               onClear={clearNewCategoryImage}
               folder="categories"
-              helperText="ستظهر هذه الصورة في الصفحة الرئيسية للأقسام (المقاس المقترح: 500 × 500 بكسل)"
+              helperText="ستظهر هذه الصورة في الصفحة الرئيسية للأقسام (المقاس المقترح: 1200 × 1200 بكسل)"
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:flex sm:justify-end">
@@ -332,8 +332,8 @@ export default function CategoriesPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     {isEditing === category.id ? (
                       <div className="w-32">
-                        <ImageUploader 
-                          value={editImageUrl} 
+                        <ImageUploader
+                          value={editImageUrl}
                           onChange={handleEditImageChange}
                           onClear={() => clearEditingCategoryImage(category.id)}
                           folder="categories"
@@ -388,7 +388,7 @@ export default function CategoriesPage() {
             </tbody>
           </table>
         </div>
-        
+
         {/* Mobile View */}
         <div className="block divide-y divide-brand-border md:hidden">
           {categories.map((category) => (
@@ -396,8 +396,8 @@ export default function CategoriesPage() {
               {isEditing === category.id ? (
                 <div className="flex flex-col gap-3">
                   <div className="w-full">
-                    <ImageUploader 
-                      value={editImageUrl} 
+                    <ImageUploader
+                      value={editImageUrl}
                       onChange={handleEditImageChange}
                       onClear={() => clearEditingCategoryImage(category.id)}
                       folder="categories"
