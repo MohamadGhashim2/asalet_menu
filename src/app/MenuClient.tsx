@@ -10,7 +10,7 @@ const isSupabaseOrLocal = (url: string) => url.startsWith('/') || url.includes('
 
 const SafeImage = ({ src, alt, className }: { src: string, alt: string, className?: string }) => {
   if (isSupabaseOrLocal(src)) {
-    return <Image src={src} alt={alt} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px" className={className} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+    return <Image src={src} alt={alt} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 180px" className={className} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
   }
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt={alt} className={`w-full h-full ${className || ''}`} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
@@ -392,6 +392,7 @@ export default function MenuClient({
               src="/logo.png"
               alt="Asalet Mandi Logo"
               fill
+              sizes="(max-width: 640px) 128px, 160px"
               className="object-contain drop-shadow-sm"
               priority
             />
@@ -423,7 +424,7 @@ export default function MenuClient({
                       <div
                         key={`${item.id}-${index}`}
                         onClick={() => openItem(item)}
-                        className="shrink-0 w-[160px] sm:w-[200px] bg-[#fbf9f7] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border cursor-pointer flex flex-col active:scale-95 transition-all duration-200"
+                        className="shrink-0 w-[160px] sm:w-[180px] bg-[#fbf9f7] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border cursor-pointer flex flex-col active:scale-95 transition-all duration-200"
                       >
                         <div className="aspect-square relative w-full bg-brand-cream border-b border-brand-border/50">
                           {getValidImageUrl(item.image_url) ? (
@@ -463,12 +464,12 @@ export default function MenuClient({
                 <p className="text-brand-brown font-medium">لا يوجد أقسام متاحة حالياً</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="mx-auto grid max-w-5xl grid-cols-2 justify-center gap-3 sm:grid-cols-[repeat(3,minmax(0,180px))] lg:grid-cols-[repeat(5,minmax(0,180px))]">
                 {categories.map((cat, i) => (
                   <div
                     key={cat.id}
                     onClick={() => openCategory(cat.id)}
-                    className="bg-[#fbf9f7] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border active:scale-95 transition-all duration-200 cursor-pointer flex flex-col"
+                    className="w-full max-w-[180px] justify-self-center bg-[#fbf9f7] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border active:scale-95 transition-all duration-200 cursor-pointer flex flex-col"
                     style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}
                   >
                     <div className="aspect-square relative w-full bg-brand-cream overflow-hidden border-b border-brand-border/50">
@@ -536,12 +537,12 @@ export default function MenuClient({
                   <p className="text-brand-brown font-medium">لا يوجد منتجات في هذا القسم</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="mx-auto grid max-w-5xl grid-cols-2 justify-center gap-3 sm:grid-cols-[repeat(3,minmax(0,180px))] lg:grid-cols-[repeat(5,minmax(0,180px))]">
                   {sortedItems.filter(i => i.category_id === activeCategoryView).map((item, i) => (
                     <div
                       key={item.id}
                       onClick={() => openItem(item)}
-                      className="bg-[#fbf9f7] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border active:scale-95 transition-all duration-200 cursor-pointer flex flex-col group"
+                      className="w-full max-w-[180px] justify-self-center bg-[#fbf9f7] rounded-[1.25rem] overflow-hidden shadow-sm hover:shadow-md border border-brand-border active:scale-95 transition-all duration-200 cursor-pointer flex flex-col group"
                       style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}
                     >
                       {/* Product Image */}
