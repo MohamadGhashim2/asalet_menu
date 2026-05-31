@@ -35,6 +35,16 @@ CREATE TABLE IF NOT EXISTS menu_items (
   updated_at timestamp with time zone DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS restaurant_tables (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  label text NOT NULL,
+  code text NOT NULL UNIQUE,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS item_option_groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   item_id uuid REFERENCES menu_items(id) ON DELETE CASCADE,
@@ -66,6 +76,7 @@ CREATE TABLE IF NOT EXISTS item_options (
 ALTER TABLE restaurant_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE restaurant_tables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE item_option_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE item_options ENABLE ROW LEVEL SECURITY;
 
@@ -80,6 +91,13 @@ CREATE POLICY "Admin full access for categories" ON categories FOR ALL TO authen
 
 CREATE POLICY "Public read access for menu_items" ON menu_items FOR SELECT USING (true);
 CREATE POLICY "Admin full access for menu_items" ON menu_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Replace admin@admin.com with the real admin email before running this schema.
+CREATE POLICY "Public can read active restaurant tables" ON restaurant_tables FOR SELECT TO anon USING (is_active = true);
+CREATE POLICY "Admin can read restaurant tables" ON restaurant_tables FOR SELECT TO authenticated USING (auth.jwt()->>'email' = 'admin@admin.com');
+CREATE POLICY "Admin can insert restaurant tables" ON restaurant_tables FOR INSERT TO authenticated WITH CHECK (auth.jwt()->>'email' = 'admin@admin.com');
+CREATE POLICY "Admin can update restaurant tables" ON restaurant_tables FOR UPDATE TO authenticated USING (auth.jwt()->>'email' = 'admin@admin.com') WITH CHECK (auth.jwt()->>'email' = 'admin@admin.com');
+CREATE POLICY "Admin can delete restaurant tables" ON restaurant_tables FOR DELETE TO authenticated USING (auth.jwt()->>'email' = 'admin@admin.com');
 
 CREATE POLICY "Public read access for item_option_groups" ON item_option_groups FOR SELECT USING (true);
 CREATE POLICY "Admin full access for item_option_groups" ON item_option_groups FOR ALL TO authenticated USING (true) WITH CHECK (true);

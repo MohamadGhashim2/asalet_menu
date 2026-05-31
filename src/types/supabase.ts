@@ -111,6 +111,36 @@ export interface Database {
         }
         Relationships: never[]
       }
+      restaurant_tables: {
+        Row: {
+          id: string
+          label: string
+          code: string
+          sort_order: number
+          is_active: boolean
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          label: string
+          code: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          label?: string
+          code?: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: never[]
+      }
       item_option_groups: {
         Row: {
           id: string

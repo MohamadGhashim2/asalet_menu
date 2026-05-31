@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut, LayoutDashboard, Settings, List, Package, QrCode, Menu, X, Layers, LayoutGrid } from 'lucide-react'
+import { LogOut, LayoutDashboard, Settings, List, Package, QrCode, Menu, X, Layers, LayoutGrid, Table2 } from 'lucide-react'
 
 const navLinks = [
   { href: '/asalaadmin26', label: 'لوحة القيادة', icon: LayoutDashboard },
@@ -13,6 +13,7 @@ const navLinks = [
   { href: '/asalaadmin26/items', label: 'المنتجات', icon: Package },
   { href: '/asalaadmin26/option-templates', label: 'قوالب الإضافات', icon: Layers },
   { href: '/asalaadmin26/qr', label: 'رمز الاستجابة السريعة (QR)', icon: QrCode },
+  { href: '/asalaadmin26/tables', label: 'الطاولات', icon: Table2 },
 ]
 
 export default function AdminSidebarClient({ children }: { children: React.ReactNode }) {

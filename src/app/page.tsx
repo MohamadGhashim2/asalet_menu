@@ -3,7 +3,13 @@ import MenuClient from './MenuClient'
 
 export const revalidate = 60 // Revalidate every minute
 
-export default async function HomePage() {
+type HomePageProps = {
+  searchParams: Promise<{ table?: string | string[] }>
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const resolvedSearchParams = await searchParams
+  const tableParam = Array.isArray(resolvedSearchParams.table) ? resolvedSearchParams.table[0] : resolvedSearchParams.table
   const supabase = await createClient()
 
   const [
@@ -14,7 +20,8 @@ export default async function HomePage() {
     { data: options },
     { data: templateLinks },
     { data: templates },
-    { data: templateOptions }
+    { data: templateOptions },
+    { data: selectedTable }
   ] = await Promise.all([
     supabase.from('restaurant_settings').select('*').single(),
     supabase.from('categories').select('*').eq('is_active', true).order('sort_order'),
@@ -23,7 +30,10 @@ export default async function HomePage() {
     supabase.from('item_options').select('*').eq('is_active', true).order('sort_order'),
     supabase.from('item_option_template_links').select('*').eq('is_active', true).order('sort_order'),
     supabase.from('option_group_templates').select('*').eq('is_active', true).order('sort_order'),
-    supabase.from('option_template_options').select('*').eq('is_active', true).order('sort_order')
+    supabase.from('option_template_options').select('*').eq('is_active', true).order('sort_order'),
+    tableParam
+      ? supabase.from('restaurant_tables').select('id, label, code').eq('code', tableParam).eq('is_active', true).maybeSingle()
+      : Promise.resolve({ data: null })
   ])
 
   // Process items to include their groups and options
@@ -98,6 +108,7 @@ export default async function HomePage() {
         settings={settings || undefined}
         categories={sortedCategories}
         items={processedItems}
+        table={selectedTable || undefined}
       />
     </main>
   )

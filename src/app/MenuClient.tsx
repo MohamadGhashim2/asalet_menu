@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Database } from '@/types/supabase'
-import { ChevronRight, Info, Image as ImageIcon } from 'lucide-react'
+import { ChevronRight, Info, Image as ImageIcon, MapPin } from 'lucide-react'
 import Image from 'next/image'
 import PublicFooter from '@/components/public/PublicFooter'
 
@@ -21,6 +21,7 @@ type Category = Database['public']['Tables']['categories']['Row']
 type Option = Database['public']['Tables']['item_options']['Row']
 type OptionGroup = Database['public']['Tables']['item_option_groups']['Row'] & { options: Option[], source?: 'item' | 'template' }
 type MenuItem = Database['public']['Tables']['menu_items']['Row'] & { groups: OptionGroup[] }
+type RestaurantTable = Pick<Database['public']['Tables']['restaurant_tables']['Row'], 'id' | 'label' | 'code'>
 
 type CartItem = {
   id: string
@@ -69,11 +70,13 @@ const buildMenuUrl = (href: string, state: MenuUrlState) => {
 export default function MenuClient({
   settings,
   categories,
-  items
+  items,
+  table
 }: {
   settings?: Settings
   categories: Category[]
   items: MenuItem[]
+  table?: RestaurantTable
 }) {
   const [activeCategoryView, setActiveCategoryView] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
@@ -346,7 +349,11 @@ export default function MenuClient({
   const cartTotal = cart.reduce((sum, current) => sum + current.total * current.quantity, 0)
 
   const generateWhatsAppMessage = () => {
-    let msg = `*طلب جديد من منيو أصالة:* 🛒\n\n`
+    let msg = `*طلب جديد من منيو أصالة:* 🛒\n`
+    if (table) {
+      msg += `رقم الطاولة: ${table.label}\n`
+    }
+    msg += '\n'
 
     cart.forEach((cartItem, index) => {
       msg += `${index + 1}) *${cartItem.item.name}*\n`
@@ -389,6 +396,12 @@ export default function MenuClient({
               priority
             />
           </div>
+          {table && (
+            <div className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-brand-gold/40 bg-brand-cream px-3 py-1.5 text-xs font-bold text-brand-burgundy">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-brand-gold" aria-hidden="true" />
+              <span className="min-w-0 truncate">{table.label}</span>
+            </div>
+          )}
         </div>
 
         {/* Featured Products */}
