@@ -37,17 +37,37 @@ CREATE TABLE IF NOT EXISTS item_option_template_links (
   UNIQUE(item_id, template_id)
 );
 
+CREATE INDEX IF NOT EXISTS option_group_templates_active_sort_order_idx ON option_group_templates (is_active, sort_order);
+CREATE INDEX IF NOT EXISTS option_template_options_template_active_sort_order_idx ON option_template_options (template_id, is_active, sort_order);
+CREATE INDEX IF NOT EXISTS item_option_template_links_item_active_sort_order_idx ON item_option_template_links (item_id, is_active, sort_order);
+
 -- Enable RLS
 ALTER TABLE option_group_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE option_template_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE item_option_template_links ENABLE ROW LEVEL SECURITY;
 
--- Create policies (Public can read, authenticated can do everything)
-CREATE POLICY "Public read access for option_group_templates" ON option_group_templates FOR SELECT USING (true);
-CREATE POLICY "Admin full access for option_group_templates" ON option_group_templates FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- Replace admin@admin.com with the real admin email before running this schema.
+CREATE POLICY "Public read access for option_group_templates" ON option_group_templates FOR SELECT TO anon USING (is_active = true);
+CREATE POLICY "Admin can read option_group_templates" ON option_group_templates FOR SELECT TO authenticated USING ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
+CREATE POLICY "Admin can insert option_group_templates" ON option_group_templates FOR INSERT TO authenticated WITH CHECK ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
+CREATE POLICY "Admin can update option_group_templates" ON option_group_templates FOR UPDATE TO authenticated USING ((select auth.jwt()) ->> 'email' = 'admin@admin.com') WITH CHECK ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
+CREATE POLICY "Admin can delete option_group_templates" ON option_group_templates FOR DELETE TO authenticated USING ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
 
-CREATE POLICY "Public read access for option_template_options" ON option_template_options FOR SELECT USING (true);
-CREATE POLICY "Admin full access for option_template_options" ON option_template_options FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Public read access for option_template_options" ON option_template_options FOR SELECT TO anon USING (
+  is_active = true
+  AND EXISTS (SELECT 1 FROM option_group_templates WHERE option_group_templates.id = option_template_options.template_id AND option_group_templates.is_active = true)
+);
+CREATE POLICY "Admin can read option_template_options" ON option_template_options FOR SELECT TO authenticated USING ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
+CREATE POLICY "Admin can insert option_template_options" ON option_template_options FOR INSERT TO authenticated WITH CHECK ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
+CREATE POLICY "Admin can update option_template_options" ON option_template_options FOR UPDATE TO authenticated USING ((select auth.jwt()) ->> 'email' = 'admin@admin.com') WITH CHECK ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
+CREATE POLICY "Admin can delete option_template_options" ON option_template_options FOR DELETE TO authenticated USING ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
 
-CREATE POLICY "Public read access for item_option_template_links" ON item_option_template_links FOR SELECT USING (true);
-CREATE POLICY "Admin full access for item_option_template_links" ON item_option_template_links FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Public read access for item_option_template_links" ON item_option_template_links FOR SELECT TO anon USING (
+  is_active = true
+  AND EXISTS (SELECT 1 FROM menu_items WHERE menu_items.id = item_option_template_links.item_id AND menu_items.is_available = true)
+  AND EXISTS (SELECT 1 FROM option_group_templates WHERE option_group_templates.id = item_option_template_links.template_id AND option_group_templates.is_active = true)
+);
+CREATE POLICY "Admin can read item_option_template_links" ON item_option_template_links FOR SELECT TO authenticated USING ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
+CREATE POLICY "Admin can insert item_option_template_links" ON item_option_template_links FOR INSERT TO authenticated WITH CHECK ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
+CREATE POLICY "Admin can update item_option_template_links" ON item_option_template_links FOR UPDATE TO authenticated USING ((select auth.jwt()) ->> 'email' = 'admin@admin.com') WITH CHECK ((select auth.jwt()) ->> 'email' = 'admin@admin.com');
+CREATE POLICY "Admin can delete item_option_template_links" ON item_option_template_links FOR DELETE TO authenticated USING ((select auth.jwt()) ->> 'email' = 'admin@admin.com');

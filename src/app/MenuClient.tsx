@@ -1,26 +1,55 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Database } from '@/types/supabase'
+import type { Database } from '@/types/supabase'
+import type { PublicMenuPayload } from '@/lib/public-menu-data'
 import { ChevronRight, Info, Image as ImageIcon, MapPin } from 'lucide-react'
 import Image from 'next/image'
 import PublicFooter from '@/components/public/PublicFooter'
 
-const isSupabaseOrLocal = (url: string) => url.startsWith('/') || url.includes('supabase.co');
+const MENU_IMAGES_PUBLIC_PREFIX = '/storage/v1/object/public/menu-images/'
+const PUBLIC_MENU_SESSION_CACHE_KEY = 'asalet-public-menu-v1'
+const PUBLIC_MENU_SESSION_CACHE_TTL = 5 * 60 * 1000
+
+const isOptimizedMenuImage = (url: string) => {
+  if (url.startsWith('/')) return true
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!supabaseUrl) return false
+
+  try {
+    const parsedUrl = new URL(url)
+    const parsedSupabaseUrl = new URL(supabaseUrl)
+    return parsedUrl.origin === parsedSupabaseUrl.origin && parsedUrl.pathname.startsWith(MENU_IMAGES_PUBLIC_PREFIX)
+  } catch {
+    return false
+  }
+}
 
 const SafeImage = ({ src, alt, className }: { src: string, alt: string, className?: string }) => {
-  if (isSupabaseOrLocal(src)) {
-    return <Image src={src} alt={alt} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 180px" className={className} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-  }
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} className={`w-full h-full ${className || ''}`} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-};
+  const [hasError, setHasError] = useState(false)
 
-type Settings = Database['public']['Tables']['restaurant_settings']['Row']
-type Category = Database['public']['Tables']['categories']['Row']
-type Option = Database['public']['Tables']['item_options']['Row']
-type OptionGroup = Database['public']['Tables']['item_option_groups']['Row'] & { options: Option[], source?: 'item' | 'template' }
-type MenuItem = Database['public']['Tables']['menu_items']['Row'] & { groups: OptionGroup[] }
+  if (hasError) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-brand-cream">
+        <ImageIcon className="h-8 w-8 text-brand-beige" aria-hidden="true" />
+      </div>
+    )
+  }
+
+  if (isOptimizedMenuImage(src)) {
+    return <Image src={src} alt={alt} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 180px" className={className} onError={() => setHasError(true)} />
+  }
+
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} loading="lazy" decoding="async" className={`w-full h-full ${className || ''}`} onError={() => setHasError(true)} />
+}
+
+type Settings = Pick<Database['public']['Tables']['restaurant_settings']['Row'], 'whatsapp' | 'currency'>
+type Category = Pick<Database['public']['Tables']['categories']['Row'], 'id' | 'name' | 'image_url' | 'sort_order' | 'created_at'>
+type Option = Pick<Database['public']['Tables']['item_options']['Row'], 'id' | 'group_id' | 'name' | 'price' | 'is_default' | 'sort_order'>
+type OptionGroup = Pick<Database['public']['Tables']['item_option_groups']['Row'], 'id' | 'title' | 'kind' | 'selection_type' | 'is_required' | 'min_select' | 'max_select' | 'sort_order'> & { options: Option[], source?: 'item' | 'template' }
+type MenuItem = Pick<Database['public']['Tables']['menu_items']['Row'], 'id' | 'category_id' | 'name' | 'description' | 'base_price' | 'image_url' | 'is_featured' | 'sort_order' | 'created_at'> & { groups: OptionGroup[] }
 type RestaurantTable = Pick<Database['public']['Tables']['restaurant_tables']['Row'], 'id' | 'label' | 'code'>
 
 type CartItem = {
@@ -38,6 +67,124 @@ type MenuUrlState = {
 }
 
 type MenuHistoryView = 'categories' | 'category' | 'product' | 'cart'
+
+type PublicMenuCacheEntry = {
+  cachedAt: number
+  data: PublicMenuPayload
+}
+
+function addToMap<T>(map: Map<string, T[]>, key: string | null, value: T) {
+  if (!key) return
+  const current = map.get(key)
+  if (current) {
+    current.push(value)
+  } else {
+    map.set(key, [value])
+  }
+}
+
+function buildMenuItems(menuData: PublicMenuPayload): MenuItem[] {
+  const optionsByGroup = new Map<string, typeof menuData.options>()
+  menuData.options.forEach((option) => addToMap(optionsByGroup, option.group_id, option))
+
+  const templateOptionsByTemplate = new Map<string, typeof menuData.templateOptions>()
+  menuData.templateOptions.forEach((option) => addToMap(templateOptionsByTemplate, option.template_id, option))
+
+  const groupsByItem = new Map<string, typeof menuData.groups>()
+  menuData.groups.forEach((group) => addToMap(groupsByItem, group.item_id, group))
+
+  const linksByItem = new Map<string, typeof menuData.templateLinks>()
+  menuData.templateLinks.forEach((link) => addToMap(linksByItem, link.item_id, link))
+
+  const templatesById = new Map(menuData.templates.map((template) => [template.id, template]))
+
+  return menuData.items.map((item) => {
+    const itemGroups = (groupsByItem.get(item.id) || []).map((group) => ({
+      ...group,
+      source: 'item' as const,
+      options: optionsByGroup.get(group.id) || [],
+    }))
+
+    const linkedGroups = (linksByItem.get(item.id) || []).flatMap((link) => {
+      const template = link.template_id ? templatesById.get(link.template_id) : undefined
+      if (!template) return []
+
+      const linkedOptions = (templateOptionsByTemplate.get(template.id) || []).map((option) => ({
+        id: `template-option:${option.id}`,
+        group_id: `template:${template.id}`,
+        name: option.name,
+        price: option.price,
+        is_default: option.is_default,
+        sort_order: option.sort_order,
+      }))
+
+      return [{
+        id: `template:${template.id}`,
+        title: template.display_title,
+        kind: template.kind,
+        selection_type: template.selection_type,
+        is_required: template.is_required,
+        min_select: template.min_select,
+        max_select: template.max_select,
+        sort_order: link.sort_order ?? template.sort_order ?? 0,
+        source: 'template' as const,
+        options: linkedOptions,
+      }]
+    })
+
+    const allGroups = [...itemGroups, ...linkedGroups]
+    allGroups.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+
+    return {
+      ...item,
+      groups: allGroups,
+    }
+  })
+}
+
+function isPublicMenuPayload(value: unknown): value is PublicMenuPayload {
+  if (!value || typeof value !== 'object') return false
+
+  const payload = value as Partial<PublicMenuPayload>
+  return Array.isArray(payload.categories)
+    && Array.isArray(payload.items)
+    && Array.isArray(payload.groups)
+    && Array.isArray(payload.options)
+    && Array.isArray(payload.templateLinks)
+    && Array.isArray(payload.templates)
+    && Array.isArray(payload.templateOptions)
+    && Array.isArray(payload.tables)
+}
+
+function readPublicMenuCache(): PublicMenuCacheEntry | null {
+  try {
+    const cachedValue = window.sessionStorage.getItem(PUBLIC_MENU_SESSION_CACHE_KEY)
+    if (!cachedValue) return null
+
+    const parsedValue = JSON.parse(cachedValue) as Partial<PublicMenuCacheEntry>
+    if (typeof parsedValue.cachedAt !== 'number' || !isPublicMenuPayload(parsedValue.data)) {
+      return null
+    }
+
+    return {
+      cachedAt: parsedValue.cachedAt,
+      data: parsedValue.data,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writePublicMenuCache(data: PublicMenuPayload) {
+  try {
+    window.sessionStorage.setItem(PUBLIC_MENU_SESSION_CACHE_KEY, JSON.stringify({
+      cachedAt: Date.now(),
+      data,
+    }))
+  } catch {
+    // Browsing modes with disabled storage still use the CDN-backed API.
+  }
+}
 
 const buildInitialSelections = (item: MenuItem) => {
   const initialSelections: Record<string, string[]> = {}
@@ -67,17 +214,12 @@ const buildMenuUrl = (href: string, state: MenuUrlState) => {
   return `${url.pathname}${url.search}${url.hash}`
 }
 
-export default function MenuClient({
-  settings,
-  categories,
-  items,
-  table
-}: {
-  settings?: Settings
-  categories: Category[]
-  items: MenuItem[]
-  table?: RestaurantTable
-}) {
+export default function MenuClient() {
+  const [menuData, setMenuData] = useState<PublicMenuPayload | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [isUsingStaleCache, setIsUsingStaleCache] = useState(false)
+  const [tableCode, setTableCode] = useState<string | null>(null)
   const [activeCategoryView, setActiveCategoryView] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [selections, setSelections] = useState<Record<string, string[]>>({})
@@ -88,6 +230,18 @@ export default function MenuClient({
   const [isCartOpen, setIsCartOpen] = useState(false)
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const settings: Settings | undefined = menuData?.settings || undefined
+  const categories = useMemo<Category[]>(() => [...(menuData?.categories || [])].sort((a, b) => {
+    const sortA = a.sort_order ?? 0
+    const sortB = b.sort_order ?? 0
+    if (sortA !== sortB) return sortA - sortB
+    return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
+  }), [menuData])
+  const items = useMemo(() => menuData ? buildMenuItems(menuData) : [], [menuData])
+  const table = useMemo<RestaurantTable | undefined>(
+    () => tableCode ? menuData?.tables.find((currentTable) => currentTable.code === tableCode) : undefined,
+    [menuData, tableCode],
+  )
   const currency = settings?.currency || 'ر.س'
 
   // Client-side sort fallback for items (sort_order then created_at)
@@ -104,6 +258,67 @@ export default function MenuClient({
     return url;
   };
 
+  useEffect(() => {
+    let cancelled = false
+
+    const loadMenu = async () => {
+      const cachedMenu = readPublicMenuCache()
+      const cacheIsFresh = cachedMenu && Date.now() - cachedMenu.cachedAt < PUBLIC_MENU_SESSION_CACHE_TTL
+
+      if (cacheIsFresh) {
+        setMenuData(cachedMenu.data)
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        const response = await fetch('/api/public-menu')
+        if (!response.ok) {
+          throw new Error(`Public menu request failed with status ${response.status}`)
+        }
+
+        const data: unknown = await response.json()
+        if (!isPublicMenuPayload(data)) {
+          throw new Error('Public menu response is invalid')
+        }
+
+        if (cancelled) return
+
+        writePublicMenuCache(data)
+        setMenuData(data)
+      } catch (error) {
+        console.error('Public menu load failed:', error)
+        if (cancelled) return
+
+        if (cachedMenu) {
+          setMenuData(cachedMenu.data)
+          setIsUsingStaleCache(true)
+        } else {
+          setLoadError(true)
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadMenu()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const synchronizeTableFromUrl = () => {
+      setTableCode(new URL(window.location.href).searchParams.get('table'))
+    }
+
+    synchronizeTableFromUrl()
+    window.addEventListener('popstate', synchronizeTableFromUrl)
+    return () => window.removeEventListener('popstate', synchronizeTableFromUrl)
+  }, [])
 
 
   useEffect(() => {
@@ -145,6 +360,8 @@ export default function MenuClient({
   }
 
   useEffect(() => {
+    if (!menuData) return
+
     const synchronizeMenuFromUrl = () => {
       const url = new URL(window.location.href)
       const categoryId = url.searchParams.get('category')
@@ -184,7 +401,7 @@ export default function MenuClient({
     synchronizeMenuFromUrl()
     window.addEventListener('popstate', synchronizeMenuFromUrl)
     return () => window.removeEventListener('popstate', synchronizeMenuFromUrl)
-  }, [categories, sortedItems])
+  }, [categories, menuData, sortedItems])
 
   useEffect(() => {
     if (!selectedItem && !isCartOpen) return
@@ -403,6 +620,11 @@ export default function MenuClient({
               <span className="min-w-0 truncate">{table.label}</span>
             </div>
           )}
+          {isUsingStaleCache && (
+            <p className="mt-2 rounded-full border border-brand-gold/40 bg-brand-cream px-3 py-1 text-xs font-bold text-brand-brown">
+              قد تكون بيانات المنيو غير محدثة حالياً
+            </p>
+          )}
         </div>
 
         {/* Featured Products */}
@@ -458,7 +680,17 @@ export default function MenuClient({
             <div className="flex items-center mb-6">
               <h2 className="text-[22px] font-black text-brand-text">قائمة الطعام</h2>
             </div>
-            {categories.length === 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
+                <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
+                <p className="text-brand-brown font-medium">جاري تحميل المنيو...</p>
+              </div>
+            ) : loadError ? (
+              <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
+                <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
+                <p className="text-brand-brown font-medium">تعذر تحميل المنيو حالياً، يرجى المحاولة بعد قليل</p>
+              </div>
+            ) : categories.length === 0 ? (
               <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
                 <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
                 <p className="text-brand-brown font-medium">لا يوجد أقسام متاحة حالياً</p>

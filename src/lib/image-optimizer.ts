@@ -1,5 +1,5 @@
-const MENU_IMAGE_SIZE = 1200
-const MENU_IMAGE_QUALITY = 0.98
+const MENU_IMAGE_SIZE = 500
+const MENU_IMAGE_QUALITY = 0.85
 const MENU_IMAGE_BACKGROUND = '#F7F1E8'
 
 export type MenuImageMode = 'product' | 'category'

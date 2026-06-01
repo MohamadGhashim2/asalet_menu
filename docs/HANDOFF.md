@@ -20,6 +20,7 @@ The QR Menu MVP has been implemented as requested.
 
 ## Next Steps
 - Execute the SQL schema (`supabase/sql/schema.sql`) in the Supabase project.
+- For an existing Supabase project, replace `admin@admin.com` with the real admin email in `supabase/sql/harden-production-resources.sql`, review it, and run it once from the Supabase SQL editor. This adds read-path indexes and replaces earlier permissive policies with active-read/admin-write policies.
 - Execute `supabase/sql/clear-legacy-menu-assets-image-urls.sql` in your Supabase SQL editor to clean up legacy image references.
 - Configure environment variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_ADMIN_LOGIN_EMAIL`.
 - Create the `menu-images` bucket in Supabase Storage.
@@ -50,6 +51,16 @@ node scripts/delete-storage-orphans.mjs --confirm
 ```
 
 It reuses the audit result, deletes only unreferenced files from `menu-images` in batches, logs each deleted path, and continues safely if an individual delete fails.
+
+Run the audit periodically, especially after bulk menu edits. Keep the delete step manual so orphan paths can be reviewed before removal.
+
+## Public Menu Cache And Vercel Firewall
+- Public customers load one cached payload from `/api/public-menu`. The response is fresh at the CDN for 5 minutes and can be served stale while revalidating for 24 hours.
+- Recommended Vercel Firewall rate limits:
+  - `/asalaadmin26/login`: 10 requests per 1 minute per IP.
+  - `/asalaadmin26/*`: 120 requests per 1 minute per IP.
+  - `/api/public-menu`: 300-600 requests per 1 minute per IP.
+- Do not aggressively rate-limit `/`. Restaurant customers can share the same Wi-Fi and public IP.
 
 ## GitHub Deployment & Production Readiness
 This project is built as a single-client MVP ready for deployment on Vercel:
