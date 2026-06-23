@@ -9,7 +9,7 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "Qur Menu",
+  title: "Qr Menu",
   description: "Digital QR Menu",
 };
 
