@@ -3,14 +3,17 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/supabase'
+import { useAdminText } from '@/i18n/admin-text'
 
 type Settings = Database['public']['Tables']['restaurant_settings']['Row']
 
 export default function SettingsPage() {
+  const tx = useAdminText()
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [messageIsError, setMessageIsError] = useState(false)
   const supabase = createClient()
 
   async function fetchSettings() {
@@ -47,6 +50,7 @@ export default function SettingsPage() {
 
     setSaving(true)
     setMessage('')
+    setMessageIsError(false)
     
     const { error } = await supabase
       .from('restaurant_settings')
@@ -59,23 +63,24 @@ export default function SettingsPage() {
 
     setSaving(false)
     if (error) {
-      setMessage('حدث خطأ أثناء الحفظ')
+      setMessage(tx('حدث خطأ أثناء الحفظ'))
+      setMessageIsError(true)
     } else {
-      setMessage('تم الحفظ بنجاح')
+      setMessage(tx('تم الحفظ بنجاح'))
     }
   }
 
-  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">جاري التحميل...</div>
+  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">{tx('جاري التحميل...')}</div>
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold text-brand-text">إعدادات المطعم</h1>
-        <p className="text-sm leading-6 text-brand-brown">بيانات الطلب الأساسية التي تظهر في تجربة المنيو.</p>
+        <h1 className="text-2xl font-bold text-brand-text">{tx('إعدادات المطعم')}</h1>
+        <p className="text-sm leading-6 text-brand-brown">{tx('بيانات الطلب الأساسية التي تظهر في تجربة المنيو.')}</p>
       </div>
       
       {message && (
-        <div className={`rounded-lg border p-4 text-sm font-bold ${message.includes('خطأ') ? 'border-red-100 bg-red-50 text-red-700' : 'border-green-100 bg-green-50 text-green-700'}`}>
+        <div className={`rounded-lg border p-4 text-sm font-bold ${messageIsError ? 'border-red-100 bg-red-50 text-red-700' : 'border-green-100 bg-green-50 text-green-700'}`}>
           {message}
         </div>
       )}
@@ -83,7 +88,7 @@ export default function SettingsPage() {
       <form onSubmit={saveSettings} className="space-y-5 rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
         <div>
           <label className="mb-2 block text-sm font-bold text-brand-text">
-            رقم الواتساب (للطلبات)
+            {tx('رقم الواتساب (للطلبات)')}
           </label>
           <input
             type="text"
@@ -97,7 +102,7 @@ export default function SettingsPage() {
 
         <div>
           <label className="mb-2 block text-sm font-bold text-brand-text">
-            العملة
+            {tx('العملة')}
           </label>
           <input
             type="text"
@@ -109,7 +114,7 @@ export default function SettingsPage() {
 
         <div>
           <label className="mb-2 block text-sm font-bold text-brand-text">
-            الضريبة (%)
+            {tx('الضريبة (%)')}
           </label>
           <input
             type="number"
@@ -125,7 +130,7 @@ export default function SettingsPage() {
           disabled={saving}
           className="min-h-11 w-full rounded-xl bg-brand-burgundy px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:opacity-50"
         >
-          {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+          {saving ? tx('جاري الحفظ...') : tx('حفظ التغييرات')}
         </button>
       </form>
     </div>

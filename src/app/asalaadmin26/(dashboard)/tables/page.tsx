@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import QRCode from 'react-qr-code'
 import AdminSwitch from '../../components/AdminSwitch'
+import { useAdminText } from '@/i18n/admin-text'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/supabase'
 
@@ -35,6 +36,7 @@ const getQrFileName = (table: RestaurantTable) => {
 }
 
 export default function TablesPage() {
+  const tx = useAdminText()
   const supabase = useMemo(() => createClient(), [])
   const [tables, setTables] = useState<RestaurantTable[]>([])
   const [siteUrl, setSiteUrl] = useState('')
@@ -66,7 +68,7 @@ export default function TablesPage() {
       if (!isCurrent) return
 
       if (error) {
-        setFeedback({ tone: 'error', text: `تعذر تحميل الطاولات: ${error.message}` })
+        setFeedback({ tone: 'error', text: tx('تعذر تحميل الطاولات: {message}', { message: error.message }) })
       } else {
         setTables(data || [])
       }
@@ -78,7 +80,7 @@ export default function TablesPage() {
     return () => {
       isCurrent = false
     }
-  }, [supabase])
+  }, [supabase, tx])
 
   useEffect(() => {
     const clearPrintTable = () => setPrintTable(null)
@@ -99,7 +101,7 @@ export default function TablesPage() {
   const createTable = async () => {
     const label = newLabel.trim()
     if (!label) {
-      setFeedback({ tone: 'error', text: 'يرجى كتابة اسم أو رقم الطاولة.' })
+      setFeedback({ tone: 'error', text: tx('يرجى كتابة اسم أو رقم الطاولة.') })
       return
     }
 
@@ -118,11 +120,11 @@ export default function TablesPage() {
       .single()
 
     if (error) {
-      setFeedback({ tone: 'error', text: `تعذر إضافة الطاولة: ${error.message}` })
+      setFeedback({ tone: 'error', text: tx('تعذر إضافة الطاولة: {message}', { message: error.message }) })
     } else {
       setTables(current => [...current, data])
       setNewLabel('')
-      setFeedback({ tone: 'success', text: `تمت إضافة ${data.label}.` })
+      setFeedback({ tone: 'success', text: tx('تمت إضافة {name}.', { name: data.label }) })
     }
     setCreating(false)
   }
@@ -142,7 +144,7 @@ export default function TablesPage() {
       .single()
 
     if (error) {
-      setFeedback({ tone: 'error', text: `تعذر حفظ التغييرات: ${error.message}` })
+      setFeedback({ tone: 'error', text: tx('تعذر حفظ التغييرات: {message}', { message: error.message }) })
     } else {
       setTables(current => current
         .map(table => table.id === tableId ? data : table)
@@ -163,29 +165,29 @@ export default function TablesPage() {
   const saveEditing = async (table: RestaurantTable) => {
     const label = editLabel.trim()
     if (!label) {
-      setFeedback({ tone: 'error', text: 'اسم الطاولة مطلوب.' })
+      setFeedback({ tone: 'error', text: tx('اسم الطاولة مطلوب.') })
       return
     }
 
     const saved = await updateTable(
       table.id,
       { label, sort_order: Number.isFinite(editSortOrder) ? editSortOrder : table.sort_order },
-      'تم تحديث بيانات الطاولة.',
+      tx('تم تحديث بيانات الطاولة.'),
     )
     if (saved) setEditingId(null)
   }
 
   const deleteTable = async (table: RestaurantTable) => {
-    if (!window.confirm(`هل تريد حذف ${table.label}؟ لن يعمل رابطها بعد الحذف.`)) return
+    if (!window.confirm(tx('هل تريد حذف {name}؟ لن يعمل رابطها بعد الحذف.', { name: table.label }))) return
 
     setSavingId(table.id)
     setFeedback(null)
     const { error } = await supabase.from('restaurant_tables').delete().eq('id', table.id)
     if (error) {
-      setFeedback({ tone: 'error', text: `تعذر حذف الطاولة: ${error.message}` })
+      setFeedback({ tone: 'error', text: tx('تعذر حذف الطاولة: {message}', { message: error.message }) })
     } else {
       setTables(current => current.filter(currentTable => currentTable.id !== table.id))
-      setFeedback({ tone: 'success', text: `تم حذف ${table.label}.` })
+      setFeedback({ tone: 'success', text: tx('تم حذف {name}.', { name: table.label }) })
     }
     setSavingId(null)
   }
@@ -193,9 +195,9 @@ export default function TablesPage() {
   const copyTableUrl = async (tableUrl: string) => {
     try {
       await navigator.clipboard.writeText(tableUrl)
-      setFeedback({ tone: 'success', text: 'تم نسخ رابط الطاولة.' })
+      setFeedback({ tone: 'success', text: tx('تم نسخ رابط الطاولة.') })
     } catch {
-      setFeedback({ tone: 'error', text: 'تعذر نسخ الرابط. يمكنك نسخه يدويا.' })
+      setFeedback({ tone: 'error', text: tx('تعذر نسخ الرابط. يمكنك نسخه يدويا.') })
     }
   }
 
@@ -203,7 +205,7 @@ export default function TablesPage() {
     const qrContainer = document.getElementById(`table-qr-${table.id}`)
     const svg = qrContainer?.querySelector('svg')
     if (!svg) {
-      setFeedback({ tone: 'error', text: 'تعذر تجهيز ملف كيو آر.' })
+      setFeedback({ tone: 'error', text: tx('تعذر تجهيز ملف كيو آر.') })
       return
     }
 
@@ -219,7 +221,7 @@ export default function TablesPage() {
       const context = canvas.getContext('2d')
       if (!context) {
         URL.revokeObjectURL(svgUrl)
-        setFeedback({ tone: 'error', text: 'تعذر تجهيز ملف كيو آر.' })
+        setFeedback({ tone: 'error', text: tx('تعذر تجهيز ملف كيو آر.') })
         return
       }
 
@@ -229,7 +231,7 @@ export default function TablesPage() {
       canvas.toBlob(blob => {
         URL.revokeObjectURL(svgUrl)
         if (!blob) {
-          setFeedback({ tone: 'error', text: 'تعذر تجهيز ملف كيو آر.' })
+          setFeedback({ tone: 'error', text: tx('تعذر تجهيز ملف كيو آر.') })
           return
         }
 
@@ -239,13 +241,13 @@ export default function TablesPage() {
         link.download = getQrFileName(table)
         link.click()
         URL.revokeObjectURL(pngUrl)
-        setFeedback({ tone: 'success', text: `تم تحميل كيو آر ${table.label}.` })
+        setFeedback({ tone: 'success', text: tx('تم تحميل كيو آر {name}.', { name: table.label }) })
       }, 'image/png')
     }
 
     image.onerror = () => {
       URL.revokeObjectURL(svgUrl)
-      setFeedback({ tone: 'error', text: 'تعذر تجهيز ملف كيو آر.' })
+      setFeedback({ tone: 'error', text: tx('تعذر تجهيز ملف كيو آر.') })
     }
     image.src = svgUrl
   }
@@ -259,8 +261,8 @@ export default function TablesPage() {
     <>
       <div className="space-y-5">
         <div>
-          <h1 className="text-2xl font-bold text-brand-text">الطاولات</h1>
-          <p className="mt-1 text-sm leading-6 text-brand-brown">أنشئ رابطا وكيو آر مستقرا لكل طاولة ليظهر رقمها داخل رسالة الطلب.</p>
+          <h1 className="text-2xl font-bold text-brand-text">{tx('الطاولات')}</h1>
+          <p className="mt-1 text-sm leading-6 text-brand-brown">{tx('أنشئ رابطا وكيو آر مستقرا لكل طاولة ليظهر رقمها داخل رسالة الطلب.')}</p>
         </div>
 
         {feedback && (
@@ -275,19 +277,19 @@ export default function TablesPage() {
 
         <section className="rounded-xl border border-brand-border bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-4">
-            <h2 className="font-bold text-brand-text">إضافة طاولة</h2>
-            <p className="mt-1 text-sm leading-6 text-brand-brown">اكتب الاسم كما تريد أن يظهر للعميل، مثل: طاولة 1.</p>
+            <h2 className="font-bold text-brand-text">{tx('إضافة طاولة')}</h2>
+            <p className="mt-1 text-sm leading-6 text-brand-brown">{tx('اكتب الاسم كما تريد أن يظهر للعميل، مثل: طاولة 1.')}</p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <label className="min-w-0 flex-1">
-              <span className="mb-1.5 block text-sm font-bold text-brand-text">اسم الطاولة</span>
+              <span className="mb-1.5 block text-sm font-bold text-brand-text">{tx('اسم الطاولة')}</span>
               <input
                 value={newLabel}
                 onChange={event => setNewLabel(event.target.value)}
                 onKeyDown={event => {
                   if (event.key === 'Enter') void createTable()
                 }}
-                placeholder="مثال: طاولة 1"
+                placeholder={tx('مثال: طاولة 1')}
                 className="min-h-11 w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-sm text-brand-text outline-none transition-colors focus:border-brand-gold"
               />
             </label>
@@ -298,7 +300,7 @@ export default function TablesPage() {
               className="flex min-h-11 shrink-0 items-center justify-center gap-2 self-end rounded-xl bg-brand-burgundy px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus className="h-4 w-4" />
-              {creating ? 'جاري الإضافة...' : 'إضافة طاولة'}
+              {creating ? tx('جاري الإضافة...') : tx('إضافة طاولة')}
             </button>
           </div>
         </section>
@@ -306,19 +308,19 @@ export default function TablesPage() {
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-bold text-brand-text">قائمة الطاولات</h2>
-              <p className="mt-1 text-sm text-brand-brown">{tables.length} طاولة</p>
+              <h2 className="font-bold text-brand-text">{tx('قائمة الطاولات')}</h2>
+              <p className="mt-1 text-sm text-brand-brown">{tx('{count} طاولة', { count: tables.length })}</p>
             </div>
             <Table2 className="h-6 w-6 shrink-0 text-brand-gold" />
           </div>
 
           {loading ? (
-            <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">جاري تحميل الطاولات...</div>
+            <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">{tx('جاري تحميل الطاولات...')}</div>
           ) : tables.length === 0 ? (
             <div className="rounded-xl border border-dashed border-brand-border bg-white p-8 text-center">
               <QrCode className="mx-auto h-9 w-9 text-brand-gold" />
-              <p className="mt-3 font-bold text-brand-text">لا توجد طاولات بعد</p>
-              <p className="mt-1 text-sm leading-6 text-brand-brown">أضف أول طاولة ليظهر رابطها وكيو آر الخاص بها هنا.</p>
+              <p className="mt-3 font-bold text-brand-text">{tx('لا توجد طاولات بعد')}</p>
+              <p className="mt-1 text-sm leading-6 text-brand-brown">{tx('أضف أول طاولة ليظهر رابطها وكيو آر الخاص بها هنا.')}</p>
             </div>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
@@ -338,7 +340,7 @@ export default function TablesPage() {
                         {isEditing ? (
                           <div className="grid gap-3">
                             <label>
-                              <span className="mb-1 block text-xs font-bold text-brand-brown">اسم الطاولة</span>
+                              <span className="mb-1 block text-xs font-bold text-brand-brown">{tx('اسم الطاولة')}</span>
                               <input
                                 value={editLabel}
                                 onChange={event => setEditLabel(event.target.value)}
@@ -346,7 +348,7 @@ export default function TablesPage() {
                               />
                             </label>
                             <label>
-                              <span className="mb-1 block text-xs font-bold text-brand-brown">الترتيب</span>
+                              <span className="mb-1 block text-xs font-bold text-brand-brown">{tx('الترتيب')}</span>
                               <input
                                 type="number"
                                 value={editSortOrder}
@@ -360,16 +362,16 @@ export default function TablesPage() {
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <h3 className="break-words text-lg font-bold text-brand-text">{table.label}</h3>
-                                <p className="mt-1 text-xs text-brand-brown">الترتيب: {table.sort_order}</p>
+                                <p className="mt-1 text-xs text-brand-brown">{tx('الترتيب: {count}', { count: table.sort_order })}</p>
                               </div>
                               <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${table.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                {table.is_active ? 'نشطة' : 'متوقفة'}
+                                {table.is_active ? tx('نشطة') : tx('متوقفة')}
                               </span>
                             </div>
                             <AdminSwitch
                               checked={table.is_active}
-                              onCheckedChange={checked => void updateTable(table.id, { is_active: checked }, checked ? 'تم تفعيل الطاولة.' : 'تم إيقاف الطاولة.')}
-                              label="نشطة"
+                              onCheckedChange={checked => void updateTable(table.id, { is_active: checked }, checked ? tx('تم تفعيل الطاولة.') : tx('تم إيقاف الطاولة.'))}
+                              label={tx('نشطة')}
                               disabled={isSaving}
                               className="mt-4 inline-flex min-h-10 items-center gap-3 rounded-lg"
                               labelClassName="text-sm font-bold text-brand-text"
@@ -393,7 +395,7 @@ export default function TablesPage() {
                             className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-brand-burgundy px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
                           >
                             <Save className="h-4 w-4" />
-                            {isSaving ? 'جاري الحفظ...' : 'حفظ'}
+                            {isSaving ? tx('جاري الحفظ...') : tx('حفظ')}
                           </button>
                           <button
                             type="button"
@@ -402,7 +404,7 @@ export default function TablesPage() {
                             className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-brand-border bg-white px-3 py-2 text-xs font-bold text-brand-brown disabled:opacity-60"
                           >
                             <X className="h-4 w-4" />
-                            إلغاء
+                            {tx('إلغاء')}
                           </button>
                         </>
                       ) : (
@@ -413,7 +415,7 @@ export default function TablesPage() {
                           className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-brand-border bg-white px-3 py-2 text-xs font-bold text-brand-burgundy disabled:opacity-60"
                         >
                           <Pencil className="h-4 w-4" />
-                          تعديل
+                          {tx('تعديل')}
                         </button>
                       )}
 
@@ -423,7 +425,7 @@ export default function TablesPage() {
                         className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-brand-border bg-white px-3 py-2 text-xs font-bold text-brand-brown"
                       >
                         <Copy className="h-4 w-4" />
-                        نسخ الرابط
+                        {tx('نسخ الرابط')}
                       </button>
                       <button
                         type="button"
@@ -431,7 +433,7 @@ export default function TablesPage() {
                         className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-brand-border bg-white px-3 py-2 text-xs font-bold text-brand-brown"
                       >
                         <Download className="h-4 w-4" />
-                        تحميل كيو آر
+                        {tx('تحميل كيو آر')}
                       </button>
                       <button
                         type="button"
@@ -439,7 +441,7 @@ export default function TablesPage() {
                         className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-brand-border bg-white px-3 py-2 text-xs font-bold text-brand-brown"
                       >
                         <Printer className="h-4 w-4" />
-                        طباعة
+                        {tx('طباعة')}
                       </button>
                       <button
                         type="button"
@@ -448,7 +450,7 @@ export default function TablesPage() {
                         className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 disabled:opacity-60"
                       >
                         <Trash2 className="h-4 w-4" />
-                        حذف
+                        {tx('حذف')}
                       </button>
                     </div>
                   </article>
@@ -467,7 +469,7 @@ export default function TablesPage() {
             <div className="my-6 rounded-xl border-4 border-brand-cream bg-white p-4">
               <QRCode value={getTableUrl(printTable.code)} size={520} level="H" />
             </div>
-            <p className="text-xl font-bold text-brand-text">امسح الكود لعرض المنيو</p>
+            <p className="text-xl font-bold text-brand-text">{tx('امسح الكود لعرض المنيو')}</p>
           </div>
         </div>
       )}

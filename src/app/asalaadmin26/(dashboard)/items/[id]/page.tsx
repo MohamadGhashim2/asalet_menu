@@ -4,17 +4,22 @@ import { useEffect, useState, use } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/supabase'
 import { useRouter } from 'next/navigation'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, Languages } from 'lucide-react'
 import ImageUploader from '../../../components/ImageUploader'
 import AdminSwitch from '../../../components/AdminSwitch'
 import { deleteMenuImagesIfUnused } from '@/lib/storage-images'
+import { useAdminText } from '@/i18n/admin-text'
 
 type Category = Database['public']['Tables']['categories']['Row']
 type MenuItem = Database['public']['Tables']['menu_items']['Row']
 type OptionGroup = Database['public']['Tables']['item_option_groups']['Row']
 type Option = Database['public']['Tables']['item_options']['Row']
+type OptionGroupTranslation = Database['public']['Tables']['item_option_group_translations']['Row']
+type OptionTranslation = Database['public']['Tables']['item_option_translations']['Row']
+type ContentLocale = 'ar' | 'en' | 'tr'
 
 export default function ItemFormPage({ params }: { params: Promise<{ id: string }> }) {
+  const tx = useAdminText()
   const resolvedParams = use(params)
   const id = resolvedParams.id
   const isNew = id === 'new'
@@ -38,11 +43,20 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
     is_featured: false,
     sort_order: 0,
   })
+  const [englishItemName, setEnglishItemName] = useState('')
+  const [englishItemDescription, setEnglishItemDescription] = useState('')
+  const [turkishItemName, setTurkishItemName] = useState('')
+  const [turkishItemDescription, setTurkishItemDescription] = useState('')
+  const [contentLocale, setContentLocale] = useState<ContentLocale>('ar')
   
   // To handle null vs number input nicely
   const [basePriceInput, setBasePriceInput] = useState<string>('0')
 
   const [groups, setGroups] = useState<(OptionGroup & { options: Option[] })[]>([])
+  const [englishGroupTitles, setEnglishGroupTitles] = useState<Record<string, string>>({})
+  const [englishOptionNames, setEnglishOptionNames] = useState<Record<string, string>>({})
+  const [turkishGroupTitles, setTurkishGroupTitles] = useState<Record<string, string>>({})
+  const [turkishOptionNames, setTurkishOptionNames] = useState<Record<string, string>>({})
   
   // Template Linking State
   const [availableTemplates, setAvailableTemplates] = useState<Database['public']['Tables']['option_group_templates']['Row'][]>([])
@@ -71,14 +85,38 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
     if (templates) setAvailableTemplates(templates)
 
     if (id !== 'new') {
-      const { data } = await supabase.from('menu_items').select('*').eq('id', id).single()
+      const [{ data }, { data: itemTranslations }] = await Promise.all([
+        supabase.from('menu_items').select('*').eq('id', id).single(),
+        supabase.from('menu_item_translations').select('*').eq('menu_item_id', id).in('locale', ['en', 'tr']),
+      ])
       if (data) {
         setItem(data)
+        const englishTranslation = itemTranslations?.find((translation) => translation.locale === 'en')
+        const turkishTranslation = itemTranslations?.find((translation) => translation.locale === 'tr')
+        setEnglishItemName(englishTranslation?.name || '')
+        setEnglishItemDescription(englishTranslation?.description || '')
+        setTurkishItemName(turkishTranslation?.name || '')
+        setTurkishItemDescription(turkishTranslation?.description || '')
         setSavedImageUrl(data.image_url || null)
         setBasePriceInput(data.base_price !== null ? String(data.base_price) : '')
         const { data: groupsData } = await supabase.from('item_option_groups').select('*, options:item_options(*)').eq('item_id', id).order('sort_order')
-        if (groupsData) {
-          setGroups(groupsData as never[])
+        const typedGroups = groupsData as unknown as Array<OptionGroup & { options: Option[] }> | null
+        if (typedGroups) {
+          setGroups(typedGroups)
+          const groupIds = typedGroups.map((group) => group.id)
+          const optionIds = typedGroups.flatMap((group) => group.options.map((option) => option.id))
+          const [groupTranslationsResult, optionTranslationsResult] = await Promise.all([
+            groupIds.length > 0
+              ? supabase.from('item_option_group_translations').select('*').in('locale', ['en', 'tr']).in('item_option_group_id', groupIds)
+              : Promise.resolve({ data: [] as OptionGroupTranslation[] }),
+            optionIds.length > 0
+              ? supabase.from('item_option_translations').select('*').in('locale', ['en', 'tr']).in('item_option_id', optionIds)
+              : Promise.resolve({ data: [] as OptionTranslation[] }),
+          ])
+          setEnglishGroupTitles(Object.fromEntries((groupTranslationsResult.data || []).filter((translation) => translation.locale === 'en').map((translation) => [translation.item_option_group_id, translation.title])))
+          setTurkishGroupTitles(Object.fromEntries((groupTranslationsResult.data || []).filter((translation) => translation.locale === 'tr').map((translation) => [translation.item_option_group_id, translation.title])))
+          setEnglishOptionNames(Object.fromEntries((optionTranslationsResult.data || []).filter((translation) => translation.locale === 'en').map((translation) => [translation.item_option_id, translation.name])))
+          setTurkishOptionNames(Object.fromEntries((optionTranslationsResult.data || []).filter((translation) => translation.locale === 'tr').map((translation) => [translation.item_option_id, translation.name])))
         }
         
         // Fetch linked templates for this item
@@ -121,8 +159,98 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
     return cleanupError
   }
 
+  async function saveEnglishItemTranslation(menuItemId: string) {
+    const name = englishItemName.trim()
+    if (!name) {
+      return supabase.from('menu_item_translations').delete().eq('menu_item_id', menuItemId).eq('locale', 'en').then(({ error }) => error)
+    }
+
+    return supabase
+      .from('menu_item_translations')
+      .upsert({
+        menu_item_id: menuItemId,
+        locale: 'en',
+        name,
+        description: englishItemDescription.trim() || null,
+      }, { onConflict: 'menu_item_id,locale' })
+      .then(({ error }) => error)
+  }
+
+  async function saveTurkishItemTranslation(menuItemId: string) {
+    const name = turkishItemName.trim()
+    if (!name) {
+      return supabase.from('menu_item_translations').delete().eq('menu_item_id', menuItemId).eq('locale', 'tr').then(({ error }) => error)
+    }
+
+    return supabase
+      .from('menu_item_translations')
+      .upsert({
+        menu_item_id: menuItemId,
+        locale: 'tr',
+        name,
+        description: turkishItemDescription.trim() || null,
+      }, { onConflict: 'menu_item_id,locale' })
+      .then(({ error }) => error)
+  }
+
+  async function saveEnglishGroupTranslation(groupId: string) {
+    const title = (englishGroupTitles[groupId] || '').trim()
+    if (!title) {
+      const { error } = await supabase.from('item_option_group_translations').delete().eq('item_option_group_id', groupId).eq('locale', 'en')
+      return error
+    }
+
+    const { error } = await supabase
+      .from('item_option_group_translations')
+      .upsert({ item_option_group_id: groupId, locale: 'en', title }, { onConflict: 'item_option_group_id,locale' })
+    return error
+  }
+
+  async function saveEnglishOptionTranslation(optionId: string) {
+    const name = (englishOptionNames[optionId] || '').trim()
+    if (!name) {
+      const { error } = await supabase.from('item_option_translations').delete().eq('item_option_id', optionId).eq('locale', 'en')
+      return error
+    }
+
+    const { error } = await supabase
+      .from('item_option_translations')
+      .upsert({ item_option_id: optionId, locale: 'en', name }, { onConflict: 'item_option_id,locale' })
+    return error
+  }
+
+  async function saveTurkishGroupTranslation(groupId: string) {
+    const title = (turkishGroupTitles[groupId] || '').trim()
+    if (!title) {
+      const { error } = await supabase.from('item_option_group_translations').delete().eq('item_option_group_id', groupId).eq('locale', 'tr')
+      return error
+    }
+
+    const { error } = await supabase
+      .from('item_option_group_translations')
+      .upsert({ item_option_group_id: groupId, locale: 'tr', title }, { onConflict: 'item_option_group_id,locale' })
+    return error
+  }
+
+  async function saveTurkishOptionTranslation(optionId: string) {
+    const name = (turkishOptionNames[optionId] || '').trim()
+    if (!name) {
+      const { error } = await supabase.from('item_option_translations').delete().eq('item_option_id', optionId).eq('locale', 'tr')
+      return error
+    }
+
+    const { error } = await supabase
+      .from('item_option_translations')
+      .upsert({ item_option_id: optionId, locale: 'tr', name }, { onConflict: 'item_option_id,locale' })
+    return error
+  }
+
   async function saveItem(e: React.FormEvent) {
     e.preventDefault()
+    if (!item.name?.trim()) {
+      setSaveMessage('يرجى إدخال اسم المنتج بالعربية أولاً')
+      return
+    }
     setSaving(true)
     setSaveMessage('')
 
@@ -141,11 +269,19 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
         return
       }
       if (data) {
+        const [englishTranslationError, turkishTranslationError] = await Promise.all([
+          saveEnglishItemTranslation(data.id),
+          saveTurkishItemTranslation(data.id),
+        ])
+        const translationError = englishTranslationError || turkishTranslationError
         const cleanupError = await cleanupUnusedImages(imageUrlsPendingCleanup.filter(url => url !== nextImageUrl))
         setSavedImageUrl(nextImageUrl)
         setImageUrlsPendingCleanup([])
         if (cleanupError) {
           console.warn('Storage image cleanup warning after creating product:', cleanupError)
+        }
+        if (translationError) {
+          console.error('Product translation could not be saved:', translationError.message)
         }
         router.push(`/asalaadmin26/items/${data.id}`)
       }
@@ -154,6 +290,11 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
       if (error) {
         setSaveMessage('حدث خطأ أثناء حفظ المنتج: ' + error.message)
       } else {
+        const [englishTranslationError, turkishTranslationError] = await Promise.all([
+          saveEnglishItemTranslation(id),
+          saveTurkishItemTranslation(id),
+        ])
+        const translationError = englishTranslationError || turkishTranslationError
         const cleanupCandidates = [
           savedImageUrl && savedImageUrl !== nextImageUrl ? savedImageUrl : null,
           ...imageUrlsPendingCleanup.filter(url => url !== nextImageUrl),
@@ -163,7 +304,9 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
         setItem(prev => ({ ...prev, image_url: nextImageUrl }))
         setSavedImageUrl(nextImageUrl)
         setImageUrlsPendingCleanup([])
-        setSaveMessage(cleanupError
+        setSaveMessage(translationError
+          ? 'تم حفظ المنتج، لكن تعذر حفظ إحدى الترجمات: ' + translationError.message
+          : cleanupError
           ? 'تم حفظ المنتج بنجاح، لكن تعذر حذف الصورة القديمة من التخزين: ' + cleanupError
           : 'تم حفظ المنتج بنجاح')
       }
@@ -339,6 +482,23 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
       return alert('حدث خطأ أثناء إنشاء القالب');
     }
 
+    const englishTemplateTitle = (englishGroupTitles[group.id] || '').trim()
+    if (englishTemplateTitle) {
+      await supabase.from('option_group_template_translations').upsert({
+        option_group_template_id: newTemplate.id,
+        locale: 'en',
+        display_title: englishTemplateTitle,
+      }, { onConflict: 'option_group_template_id,locale' })
+    }
+    const turkishTemplateTitle = (turkishGroupTitles[group.id] || '').trim()
+    if (turkishTemplateTitle) {
+      await supabase.from('option_group_template_translations').upsert({
+        option_group_template_id: newTemplate.id,
+        locale: 'tr',
+        display_title: turkishTemplateTitle,
+      }, { onConflict: 'option_group_template_id,locale' })
+    }
+
     // Insert options
     if (group.options.length > 0) {
       const optionsToInsert = group.options.map(opt => ({
@@ -349,7 +509,21 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
         sort_order: opt.sort_order,
         is_active: opt.is_active
       }));
-      await supabase.from('option_template_options').insert(optionsToInsert);
+      const { data: createdTemplateOptions } = await supabase.from('option_template_options').insert(optionsToInsert).select()
+      const englishTemplateOptions = (createdTemplateOptions || []).flatMap((option, index) => {
+        const name = (englishOptionNames[group.options[index]?.id] || '').trim()
+        return name ? [{ option_template_option_id: option.id, locale: 'en', name }] : []
+      })
+      if (englishTemplateOptions.length > 0) {
+        await supabase.from('option_template_option_translations').insert(englishTemplateOptions)
+      }
+      const turkishTemplateOptions = (createdTemplateOptions || []).flatMap((option, index) => {
+        const name = (turkishOptionNames[group.options[index]?.id] || '').trim()
+        return name ? [{ option_template_option_id: option.id, locale: 'tr', name }] : []
+      })
+      if (turkishTemplateOptions.length > 0) {
+        await supabase.from('option_template_option_translations').insert(turkishTemplateOptions)
+      }
     }
 
     // Link to current item
@@ -365,6 +539,26 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
 
     // Update UI State
     setGroups(prev => prev.filter(g => g.id !== group.id));
+    setEnglishGroupTitles((current) => {
+      const next = { ...current }
+      delete next[group.id]
+      return next
+    })
+    setEnglishOptionNames((current) => {
+      const next = { ...current }
+      group.options.forEach((option) => delete next[option.id])
+      return next
+    })
+    setTurkishGroupTitles((current) => {
+      const next = { ...current }
+      delete next[group.id]
+      return next
+    })
+    setTurkishOptionNames((current) => {
+      const next = { ...current }
+      group.options.forEach((option) => delete next[option.id])
+      return next
+    })
     if (newLink) {
       setLinkedTemplates(prev => [...prev, newLink as never]);
       setAvailableTemplates(prev => [newTemplate, ...prev]);
@@ -373,22 +567,95 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
     alert('تم تحويل المجموعة إلى قالب وربطها بنجاح');
   }
 
-  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">جاري التحميل...</div>
+  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">{tx('جاري التحميل...')}</div>
+
+  const localizedName = contentLocale === 'ar'
+    ? item.name || ''
+    : contentLocale === 'en'
+      ? englishItemName
+      : turkishItemName
+  const localizedDescription = contentLocale === 'ar'
+    ? item.description || ''
+    : contentLocale === 'en'
+      ? englishItemDescription
+      : turkishItemDescription
+  const contentLanguageName = contentLocale === 'ar' ? 'العربية' : contentLocale === 'en' ? 'English' : 'Türkçe'
+  const contentNameLabel = contentLocale === 'ar' ? 'اسم المنتج' : contentLocale === 'en' ? 'English product name' : 'Ürün adı'
+  const contentDescriptionLabel = contentLocale === 'ar' ? 'الوصف' : contentLocale === 'en' ? 'English description' : 'Ürün açıklaması'
+
+  function updateLocalizedName(value: string) {
+    if (contentLocale === 'ar') setItem({ ...item, name: value })
+    else if (contentLocale === 'en') setEnglishItemName(value)
+    else setTurkishItemName(value)
+  }
+
+  function updateLocalizedDescription(value: string) {
+    if (contentLocale === 'ar') setItem({ ...item, description: value })
+    else if (contentLocale === 'en') setEnglishItemDescription(value)
+    else setTurkishItemDescription(value)
+  }
+
+  function localizedGroupTitle(group: OptionGroup) {
+    return contentLocale === 'ar' ? group.title : contentLocale === 'en' ? englishGroupTitles[group.id] || '' : turkishGroupTitles[group.id] || ''
+  }
+
+  function updateLocalizedGroupTitle(groupId: string, value: string) {
+    if (contentLocale === 'ar') void updateGroup(groupId, { title: value })
+    else if (contentLocale === 'en') setEnglishGroupTitles((current) => ({ ...current, [groupId]: value }))
+    else setTurkishGroupTitles((current) => ({ ...current, [groupId]: value }))
+  }
+
+  function saveLocalizedGroupTitle(groupId: string) {
+    if (contentLocale === 'en') return saveEnglishGroupTranslation(groupId)
+    if (contentLocale === 'tr') return saveTurkishGroupTranslation(groupId)
+    return Promise.resolve(null)
+  }
+
+  function localizedOptionName(option: Option) {
+    return contentLocale === 'ar' ? option.name : contentLocale === 'en' ? englishOptionNames[option.id] || '' : turkishOptionNames[option.id] || ''
+  }
+
+  function updateLocalizedOptionName(groupId: string, optionId: string, value: string) {
+    if (contentLocale === 'ar') void updateOption(groupId, optionId, { name: value })
+    else if (contentLocale === 'en') setEnglishOptionNames((current) => ({ ...current, [optionId]: value }))
+    else setTurkishOptionNames((current) => ({ ...current, [optionId]: value }))
+  }
+
+  function saveLocalizedOptionName(optionId: string) {
+    if (contentLocale === 'en') return saveEnglishOptionTranslation(optionId)
+    if (contentLocale === 'tr') return saveTurkishOptionTranslation(optionId)
+    return Promise.resolve(null)
+  }
 
   return (
     <div className="w-full max-w-5xl space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
-          <h1 className="break-words text-2xl font-bold text-brand-text">{isNew ? 'إضافة منتج' : 'تعديل المنتج'}</h1>
-          <p className="text-sm leading-6 text-brand-brown">عدّل بيانات المنتج وصورته وخياراته من أقسام واضحة.</p>
+          <h1 className="break-words text-2xl font-bold text-brand-text">{isNew ? tx('إضافة منتج') : tx('تعديل المنتج')}</h1>
+          <p className="text-sm leading-6 text-brand-brown">{tx('عدّل بيانات المنتج وصورته وخياراته من أقسام واضحة.')}</p>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:flex sm:shrink-0">
+          <label className="flex min-h-11 items-center gap-2 rounded-xl border border-brand-border bg-white px-3 text-sm font-bold text-brand-brown">
+            <Languages className="h-4 w-4 text-brand-burgundy" />
+            <span className="sr-only">{tx('لغة المحتوى')}</span>
+            <select
+              value={contentLocale}
+              onChange={(event) => setContentLocale(event.target.value as ContentLocale)}
+              className="min-w-28 bg-transparent text-sm font-bold outline-none"
+              dir="ltr"
+              aria-label={tx('لغة المحتوى')}
+            >
+              <option value="ar">العربية</option>
+              <option value="en">English</option>
+              <option value="tr">Türkçe</option>
+            </select>
+          </label>
           <button
             type="button"
             onClick={leaveProductPage}
             className="min-h-11 rounded-xl border border-brand-border bg-white px-4 py-2 text-sm font-bold text-brand-brown transition-colors hover:bg-brand-cream"
           >
-            العودة للمنتجات
+            {tx('العودة للمنتجات')}
           </button>
           <button
             type="submit"
@@ -396,7 +663,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
             disabled={saving}
             className="min-h-11 rounded-xl bg-brand-burgundy px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:opacity-50"
           >
-            {saving ? 'جاري الحفظ...' : 'حفظ المنتج'}
+            {saving ? tx('جاري الحفظ...') : tx('حفظ المنتج')}
           </button>
         </div>
       </div>
@@ -410,32 +677,39 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
       <form id="product-form" onSubmit={saveItem} className="space-y-6">
         <section className="rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 space-y-1">
-            <h2 className="text-xl font-bold text-brand-text">بيانات المنتج</h2>
-            <p className="text-sm leading-6 text-brand-brown">الاسم والقسم والسعر والحالة الأساسية.</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xl font-bold text-brand-text">{tx('محتوى المنتج')}</h2>
+              <span className="rounded-full bg-brand-cream px-3 py-1 text-xs font-bold text-brand-brown">{contentLanguageName}</span>
+            </div>
+            <p className="text-sm leading-6 text-brand-brown">
+              {contentLocale === 'ar'
+                ? tx('أدخل المحتوى الأساسي بالعربية. الاسم العربي مطلوب.')
+                : 'Optional. Leave the name blank to use the Arabic content as the fallback.'}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="min-w-0">
-              <label className="mb-2 block text-sm font-bold text-brand-text">الاسم</label>
-              <input required type="text" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={item.name} onChange={e => setItem({ ...item, name: e.target.value })} />
+              <label className="mb-2 block text-sm font-bold text-brand-text">{contentNameLabel}</label>
+              <input required={contentLocale === 'ar'} dir={contentLocale === 'ar' ? 'rtl' : 'ltr'} type="text" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={localizedName} onChange={e => updateLocalizedName(e.target.value)} />
             </div>
             <div className="min-w-0">
-              <label className="mb-2 block text-sm font-bold text-brand-text">القسم</label>
+              <label className="mb-2 block text-sm font-bold text-brand-text">{tx('القسم')}</label>
               <select required className="min-h-11 w-full rounded-lg border border-brand-border bg-white px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={item.category_id || ''} onChange={e => setItem({ ...item, category_id: e.target.value })}>
-                <option value="">اختر القسم</option>
+                <option value="">{tx('اختر القسم')}</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div className="min-w-0 md:col-span-2">
-              <label className="mb-2 block text-sm font-bold text-brand-text">الوصف</label>
-              <textarea className="w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" rows={4} value={item.description || ''} onChange={e => setItem({ ...item, description: e.target.value })} />
+              <label className="mb-2 block text-sm font-bold text-brand-text">{contentDescriptionLabel}</label>
+              <textarea dir={contentLocale === 'ar' ? 'rtl' : 'ltr'} className="w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" rows={4} value={localizedDescription} onChange={e => updateLocalizedDescription(e.target.value)} />
             </div>
             <div className="min-w-0">
-              <label className="mb-2 block text-sm font-bold text-brand-text">السعر الأساسي</label>
-              <input type="number" step="0.01" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={basePriceInput} onChange={e => setBasePriceInput(e.target.value)} placeholder="اتركه فارغاً إذا كان يعتمد على الخيارات" />
+              <label className="mb-2 block text-sm font-bold text-brand-text">{tx('السعر الأساسي')}</label>
+              <input type="number" step="0.01" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={basePriceInput} onChange={e => setBasePriceInput(e.target.value)} placeholder={tx('اتركه فارغاً إذا كان يعتمد على الخيارات')} />
             </div>
             <div className="min-w-0">
-              <label className="mb-2 block text-sm font-bold text-brand-text">ترتيب الظهور</label>
+              <label className="mb-2 block text-sm font-bold text-brand-text">{tx('الترتيب')}</label>
               <input type="number" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={item.sort_order || 0} onChange={e => setItem({ ...item, sort_order: parseInt(e.target.value) || 0 })} />
             </div>
           </div>
@@ -444,7 +718,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
             <AdminSwitch
               checked={item.is_available || false}
               onCheckedChange={(checked) => setItem({ ...item, is_available: checked })}
-              label="متاح للطلب"
+              label={tx('متاح للطلب')}
               labelPosition="start"
               className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-brand-border bg-brand-cream/40 p-4 hover:bg-brand-cream"
               labelClassName="text-sm font-bold text-brand-text"
@@ -452,7 +726,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
             <AdminSwitch
               checked={item.is_featured || false}
               onCheckedChange={(checked) => setItem({ ...item, is_featured: checked })}
-              label="منتج مميز"
+              label={tx('منتج مميز')}
               labelPosition="start"
               className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-brand-border bg-brand-cream/40 p-4 hover:bg-brand-cream"
               labelClassName="text-sm font-bold text-brand-text"
@@ -462,10 +736,9 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
 
         <section className="rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 space-y-1">
-            <h2 className="text-xl font-bold text-brand-text">صورة المنتج</h2>
-            <p className="text-sm leading-6 text-brand-brown">المقاس المقترح: 1200 × 1200 بكسل</p>
-            <p className="text-sm leading-6 text-brand-brown">يفضل رفع صورة مربعة وواضحة</p>
-            <p className="text-sm leading-6 text-brand-brown">سيتم ضغط الصورة وتحويلها إلى WebP قبل الرفع</p>
+            <h2 className="text-xl font-bold text-brand-text">{tx('صورة المنتج')}</h2>
+            <p className="text-sm leading-6 text-brand-brown">{tx('المقاس المقترح: 1200 × 1200 بكسل')}</p>
+            <p className="text-sm leading-6 text-brand-brown">{tx('يفضل رفع صورة مربعة وواضحة')}</p>
           </div>
           <div>
             <ImageUploader 
@@ -477,28 +750,32 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
         </section>
       </form>
 
-      <section className="space-y-4 rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
+      <details className="rounded-xl border border-brand-border bg-white shadow-sm">
+        <summary className="cursor-pointer px-5 py-4 text-lg font-bold text-brand-text marker:text-brand-burgundy sm:px-6">
+          {tx('القوالب المرتبطة')}
+        </summary>
+        <div className="space-y-4 border-t border-brand-border p-5 sm:p-6">
         <div className="space-y-1">
-          <h2 className="text-xl font-bold text-brand-text">القوالب المرتبطة</h2>
-          <p className="text-sm leading-6 text-brand-brown">اربط المنتج بقوالب إضافات مشتركة مثل الأحجام أو الإضافات المتكررة.</p>
+          <h2 className="text-xl font-bold text-brand-text">{tx('القوالب المرتبطة')}</h2>
+          <p className="text-sm leading-6 text-brand-brown">{tx('اربط المنتج بقوالب إضافات مشتركة مثل الأحجام أو الإضافات المتكررة.')}</p>
         </div>
 
         {isNew ? (
           <div className="rounded-xl border border-dashed border-brand-border bg-brand-cream/40 p-6 text-center text-sm text-brand-brown">
-            يرجى حفظ المنتج أولاً لتتمكن من ربط القوالب.
+            {tx('يرجى حفظ المنتج أولاً لتتمكن من ربط القوالب.')}
           </div>
         ) : (
           <div className="space-y-5">
             <div className="rounded-xl border border-brand-border bg-brand-cream/50 p-4 sm:p-5">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                 <div className="min-w-0">
-                  <label className="mb-2 block text-sm font-bold text-brand-text">اختر قالباً لربطه بهذا المنتج</label>
+                  <label className="mb-2 block text-sm font-bold text-brand-text">{tx('اختر قالباً لربطه بهذا المنتج')}</label>
                   <select
                     className="min-h-11 w-full rounded-lg border border-brand-border bg-white px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10"
                     value={selectedTemplateToLink}
                     onChange={e => setSelectedTemplateToLink(e.target.value)}
                   >
-                    <option value="">-- اختر قالب --</option>
+                    <option value="">{tx('-- اختر قالب --')}</option>
                     {availableTemplates.map(t => (
                       <option key={t.id} value={t.id}>{t.template_name} (يظهر للزبون: {t.display_title})</option>
                     ))}
@@ -510,27 +787,27 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                   disabled={!selectedTemplateToLink}
                   className="flex min-h-11 w-full items-center justify-center rounded-xl bg-brand-burgundy px-6 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:opacity-50 sm:w-auto"
                 >
-                  ربط القالب
+                  {tx('ربط القالب')}
                 </button>
               </div>
             </div>
 
             {linkedTemplates.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">لا توجد قوالب مرتبطة حالياً بهذا المنتج.</div>
+              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">{tx('لا توجد قوالب مرتبطة حالياً بهذا المنتج.')}</div>
             ) : (
               <div className="grid gap-4">
                 {linkedTemplates.map(link => (
                   <div key={link.id} className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <h3 className="break-words font-bold text-gray-800">{link.option_group_templates.template_name}</h3>
-                      <p className="mt-1 break-words text-sm leading-6 text-gray-500">النوع: {link.option_group_templates.kind} | يظهر للزبون كـ: {link.option_group_templates.display_title}</p>
+                      <p className="mt-1 break-words text-sm leading-6 text-gray-500">{tx('النوع: {kind} | يظهر للزبون كـ: {name}', { kind: link.option_group_templates.kind || '', name: link.option_group_templates.display_title || '' })}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => unlinkTemplate(link.id)}
                       className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 sm:w-auto"
                     >
-                      <Trash2 className="h-4 w-4" /> فك الارتباط
+                      <Trash2 className="h-4 w-4" /> {tx('فك الارتباط')}
                     </button>
                   </div>
                 ))}
@@ -538,13 +815,18 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
             )}
           </div>
         )}
-      </section>
+        </div>
+      </details>
 
-      <section className="space-y-4">
+      <details className="rounded-xl border border-brand-border bg-white shadow-sm">
+        <summary className="cursor-pointer px-5 py-4 text-lg font-bold text-brand-text marker:text-brand-burgundy sm:px-6">
+          {tx('مجموعات الخيارات')}
+        </summary>
+        <div className="space-y-4 border-t border-brand-border p-5 sm:p-6">
         <div className="flex flex-col gap-3 rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:flex-row sm:items-start sm:justify-between sm:p-6">
           <div className="space-y-1">
-            <h2 className="text-xl font-bold text-brand-text">مجموعات الخيارات</h2>
-            <p className="text-sm leading-6 text-brand-brown">خيارات خاصة بهذا المنتج فقط، مثل الحجم أو الإضافات.</p>
+            <h2 className="text-xl font-bold text-brand-text">{tx('مجموعات الخيارات')}</h2>
+            <p className="text-sm leading-6 text-brand-brown">{tx('خيارات خاصة بهذا المنتج فقط، مثل الحجم أو الإضافات.')}</p>
           </div>
           <button 
             type="button" 
@@ -552,53 +834,60 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
             disabled={isNew}
             className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors sm:w-auto ${isNew ? 'cursor-not-allowed bg-gray-200 text-gray-500' : 'bg-brand-burgundy text-white hover:bg-brand-burgundy-dark'}`}
           >
-            <Plus className="h-4 w-4" /> إضافة مجموعة
+            <Plus className="h-4 w-4" /> {tx('إضافة مجموعة')}
           </button>
         </div>
 
         {isNew ? (
           <div className="rounded-xl border border-dashed border-brand-border bg-white p-8 text-center text-sm text-brand-brown">
-            يرجى حفظ المنتج أولاً لتتمكن من إضافة الخيارات والتعديلات.
+            {tx('يرجى حفظ المنتج أولاً لتتمكن من إضافة الخيارات والتعديلات.')}
           </div>
         ) : groups.length === 0 ? (
           <div className="rounded-xl border border-dashed border-brand-border bg-white p-8 text-center text-sm text-brand-brown">
-            لا توجد مجموعات خيارات خاصة بهذا المنتج.
+            {tx('لا توجد مجموعات خيارات خاصة بهذا المنتج.')}
           </div>
         ) : (
           groups.map(group => (
             <div key={group.id} className="rounded-xl border border-brand-border bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-5 flex flex-col gap-3 border-b border-brand-border pb-4 sm:flex-row sm:items-center sm:justify-between">
-                <h3 className="min-w-0 break-words text-lg font-bold text-brand-text">{group.title || 'مجموعة خيارات'}</h3>
+                <h3 className="min-w-0 break-words text-lg font-bold text-brand-text">{localizedGroupTitle(group) || group.title || tx('مجموعة خيارات')}</h3>
                 <button type="button" onClick={() => deleteGroup(group.id)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 sm:w-auto">
                   <Trash2 className="h-4 w-4" />
-                  حذف المجموعة
+                  {tx('حذف المجموعة')}
                 </button>
               </div>
 
               <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="min-w-0 md:col-span-2">
-                  <label className="mb-2 block text-sm font-bold text-gray-700">عنوان المجموعة</label>
-                  <input type="text" className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={group.title} onChange={e => updateGroup(group.id, { title: e.target.value })} />
+                <div className="min-w-0 md:col-span-2" dir={contentLocale === 'ar' ? 'rtl' : 'ltr'}>
+                  <label className="mb-2 block text-sm font-bold text-gray-700">{contentLocale === 'ar' ? 'عنوان المجموعة' : contentLocale === 'en' ? 'English customer title' : 'Müşteri başlığı'}</label>
+                  <input
+                    type="text"
+                    className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10"
+                    value={localizedGroupTitle(group)}
+                    onChange={e => updateLocalizedGroupTitle(group.id, e.target.value)}
+                    onBlur={() => void saveLocalizedGroupTitle(group.id)}
+                    placeholder={contentLocale === 'ar' ? 'مثال: اختر الحجم' : contentLocale === 'en' ? 'Optional English title' : 'İsteğe bağlı Türkçe başlık'}
+                  />
                 </div>
                 <div className="min-w-0">
-                  <label className="mb-2 block text-sm font-bold text-gray-700">النوع</label>
+                  <label className="mb-2 block text-sm font-bold text-gray-700">{tx('النوع')}</label>
                   <select className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={group.kind || 'variant'} onChange={e => updateGroup(group.id, { kind: e.target.value as never })}>
-                    <option value="variant">نوع (Variant)</option>
-                    <option value="addon">إضافة (Addon)</option>
-                    <option value="modifier">تعديل (Modifier)</option>
+                    <option value="variant">{tx('محدد (Variant)')}</option>
+                    <option value="addon">{tx('إضافة (Addon)')}</option>
+                    <option value="modifier">{tx('تعديل (Modifier)')}</option>
                   </select>
                 </div>
                 <div className="min-w-0">
-                  <label className="mb-2 block text-sm font-bold text-gray-700">طريقة الاختيار</label>
+                  <label className="mb-2 block text-sm font-bold text-gray-700">{tx('طريقة الاختيار')}</label>
                   <select className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={group.selection_type || 'single'} onChange={e => updateGroup(group.id, { selection_type: e.target.value as never })}>
-                    <option value="single">اختيار واحد</option>
-                    <option value="multiple">متعدد</option>
+                    <option value="single">{tx('اختيار واحد')}</option>
+                    <option value="multiple">{tx('متعدد')}</option>
                   </select>
                 </div>
                 <AdminSwitch
                   checked={group.is_required || false}
                   onCheckedChange={(checked) => updateGroup(group.id, { is_required: checked })}
-                  label="إجباري"
+                  label={tx('إجباري')}
                   labelPosition="start"
                   className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100"
                   labelClassName="text-sm font-bold text-gray-700"
@@ -606,7 +895,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                 <AdminSwitch
                   checked={group.is_active ?? true}
                   onCheckedChange={(checked) => updateGroup(group.id, { is_active: checked })}
-                  label="نشط"
+                  label={tx('نشط')}
                   labelPosition="start"
                   className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100"
                   labelClassName="text-sm font-bold text-gray-700"
@@ -614,33 +903,40 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
-                <h4 className="mb-4 text-sm font-bold text-gray-800">الخيارات:</h4>
+                <h4 className="mb-4 text-sm font-bold text-gray-800">{tx('الخيارات:')}</h4>
                 <div className="space-y-4 sm:space-y-3">
                   {group.options.map(opt => (
                     <div key={opt.id} className="grid grid-cols-1 gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-[1fr_9rem_auto] sm:items-end sm:gap-3 sm:rounded-lg sm:p-3">
-                      <div className="min-w-0">
-                        <label className="block text-xs font-bold text-gray-600 mb-1.5 sm:hidden">الاسم</label>
-                        <input type="text" className="w-full px-3 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.name} onChange={e => updateOption(group.id, opt.id, { name: e.target.value })} placeholder="الاسم (مثال: حجم كبير)" />
+                      <div className="min-w-0" dir={contentLocale === 'ar' ? 'rtl' : 'ltr'}>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5">{contentLocale === 'ar' ? 'الاسم' : contentLocale === 'en' ? 'English option' : 'Türkçe seçenek'}</label>
+                        <input
+                          type="text"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-brand-burgundy focus:ring-brand-burgundy sm:py-2"
+                          value={localizedOptionName(opt)}
+                          onChange={e => updateLocalizedOptionName(group.id, opt.id, e.target.value)}
+                          onBlur={() => void saveLocalizedOptionName(opt.id)}
+                          placeholder={contentLocale === 'ar' ? 'الاسم (مثال: حجم كبير)' : contentLocale === 'en' ? 'Optional English name' : 'İsteğe bağlı Türkçe ad'}
+                        />
                       </div>
                       <div className="min-w-0">
-                        <label className="block text-xs font-bold text-gray-600 mb-1.5 sm:hidden">السعر الإضافي</label>
-                        <input type="number" step="0.01" className="w-full px-3 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.price || 0} onChange={e => updateOption(group.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder="السعر الإضافي" />
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5 sm:hidden">{tx('السعر الإضافي')}</label>
+                        <input type="number" step="0.01" className="w-full px-3 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy" value={opt.price || 0} onChange={e => updateOption(group.id, opt.id, { price: parseFloat(e.target.value) || 0 })} placeholder={tx('السعر الإضافي')} />
                       </div>
                       <div className="w-full sm:w-auto">
                         <button type="button" onClick={() => deleteOption(group.id, opt.id)} className="text-red-600 bg-red-50 sm:bg-transparent border border-red-100 sm:border-transparent hover:bg-red-100 py-3 sm:py-2 px-4 sm:px-2 rounded-xl sm:rounded-lg flex items-center justify-center transition-colors w-full sm:w-auto font-bold">
                           <Trash2 className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-0 mr-2" />
-                          <span className="text-sm sm:hidden">حذف الخيار</span>
+                          <span className="text-sm sm:hidden">{tx('حذف الخيار')}</span>
                         </button>
                       </div>
                     </div>
                   ))}
                   {group.options.length === 0 && (
                     <div className="rounded-lg border border-dashed border-gray-300 bg-white p-4 text-center text-sm text-gray-500">
-                      لا توجد خيارات في هذه المجموعة.
+                      {tx('لا توجد خيارات في هذه المجموعة.')}
                     </div>
                   )}
                   <button type="button" onClick={() => addOption(group.id)} className="w-full sm:w-auto mt-3 px-6 py-3.5 sm:py-2.5 bg-brand-burgundy/10 text-brand-burgundy hover:bg-brand-burgundy/20 rounded-xl sm:rounded-lg font-bold flex items-center justify-center gap-2 transition-colors text-sm">
-                    <Plus className="w-5 h-5 sm:w-4 sm:h-4" /> إضافة خيار
+                    <Plus className="w-5 h-5 sm:w-4 sm:h-4" /> {tx('إضافة خيار')}
                   </button>
                 </div>
               </div>
@@ -659,7 +955,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                       }
                     }));
                   }}
-                  label="حفظ هذه المجموعة كقالب (اختياري)"
+                  label={tx('حفظ هذه المجموعة كقالب (اختياري)')}
                   labelPosition="start"
                   className="mb-4 flex w-full items-center justify-between gap-4 rounded-xl border border-brand-burgundy/10 bg-brand-cream/30 p-4 hover:bg-brand-cream/50 sm:w-fit sm:justify-start sm:rounded-lg sm:p-3"
                   labelClassName="text-sm font-bold text-brand-burgundy"
@@ -667,10 +963,10 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                 
                 {templateStates[group.id]?.checked && (
                   <div className="bg-brand-cream/50 p-4 rounded-lg border border-brand-burgundy/20 space-y-4">
-                    <p className="text-xs text-brand-brown">اسم القالب يظهر داخل لوحة الإدارة فقط، أما العنوان الظاهر فهو الذي يراه الزبون داخل المنيو.</p>
+                    <p className="text-xs text-brand-brown">{tx('اسم القالب يظهر داخل لوحة الإدارة فقط، أما العنوان الظاهر فهو الذي يراه الزبون داخل المنيو.')}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">اسم القالب داخل الإدارة</label>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">{tx('اسم القالب داخل الإدارة')}</label>
                         <input 
                           type="text" 
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy bg-white"
@@ -679,7 +975,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">العنوان الظاهر للزبون</label>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">{tx('العنوان الظاهر للزبون')}</label>
                         <input 
                           type="text" 
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-burgundy focus:border-brand-burgundy bg-white"
@@ -694,7 +990,7 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
                         onClick={() => convertToTemplate(group)}
                         className="min-h-11 w-full rounded-xl bg-brand-burgundy px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-burgundy-dark sm:w-auto"
                       >
-                        تأكيد وحفظ كقالب
+                        {tx('تأكيد وحفظ كقالب')}
                       </button>
                     </div>
                   </div>
@@ -704,22 +1000,8 @@ export default function ItemFormPage({ params }: { params: Promise<{ id: string 
             </div>
           ))
         )}
-      </section>
-
-      <section className="rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-4 space-y-1">
-          <h2 className="text-xl font-bold text-brand-text">حفظ المنتج</h2>
-          <p className="text-sm leading-6 text-brand-brown">احفظ بيانات المنتج الأساسية والصورة. تغييرات الخيارات والقوالب تحفظ مباشرة عند تعديلها.</p>
         </div>
-        <button
-          type="submit"
-          form="product-form"
-          disabled={saving}
-          className="flex min-h-12 w-full items-center justify-center rounded-xl bg-brand-burgundy px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:opacity-50 sm:w-auto"
-        >
-          {saving ? 'جاري الحفظ...' : 'حفظ المنتج'}
-        </button>
-      </section>
+      </details>
     </div>
   )
 }

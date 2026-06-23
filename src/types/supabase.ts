@@ -330,6 +330,156 @@ export interface Database {
         }
         Relationships: never[]
       }
+      category_translations: {
+        Row: {
+          category_id: string
+          locale: string
+          name: string
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          locale: string
+          name: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          locale?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: never[]
+      }
+      menu_item_translations: {
+        Row: {
+          menu_item_id: string
+          locale: string
+          name: string
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          menu_item_id: string
+          locale: string
+          name: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          menu_item_id?: string
+          locale?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: never[]
+      }
+      item_option_group_translations: {
+        Row: {
+          item_option_group_id: string
+          locale: string
+          title: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          item_option_group_id: string
+          locale: string
+          title: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          item_option_group_id?: string
+          locale?: string
+          title?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: never[]
+      }
+      item_option_translations: {
+        Row: {
+          item_option_id: string
+          locale: string
+          name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          item_option_id: string
+          locale: string
+          name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          item_option_id?: string
+          locale?: string
+          name?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: never[]
+      }
+      option_group_template_translations: {
+        Row: {
+          option_group_template_id: string
+          locale: string
+          display_title: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          option_group_template_id: string
+          locale: string
+          display_title: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          option_group_template_id?: string
+          locale?: string
+          display_title?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: never[]
+      }
+      option_template_option_translations: {
+        Row: {
+          option_template_option_id: string
+          locale: string
+          name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          option_template_option_id: string
+          locale: string
+          name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          option_template_option_id?: string
+          locale?: string
+          name?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: never[]
+      }
     }
     Views: {
       [_ in never]: never

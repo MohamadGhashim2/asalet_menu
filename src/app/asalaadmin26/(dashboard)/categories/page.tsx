@@ -3,21 +3,35 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/supabase'
-import { Plus, Edit2, Trash2, Image as ImageIcon } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon, Languages } from 'lucide-react'
 import ImageUploader from '../../components/ImageUploader'
 import Image from 'next/image'
 import { deleteMenuImagesIfUnused } from '@/lib/storage-images'
+import { useAdminText } from '@/i18n/admin-text'
 
 type Category = Database['public']['Tables']['categories']['Row']
+type CategoryTranslation = Database['public']['Tables']['category_translations']['Row']
+type EditorLocale = 'ar' | 'en' | 'tr'
 
 export default function CategoriesPage() {
+  const tx = useAdminText()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editEnglishName, setEditEnglishName] = useState('')
+  const [editEnglishDescription, setEditEnglishDescription] = useState('')
+  const [editTurkishName, setEditTurkishName] = useState('')
+  const [editTurkishDescription, setEditTurkishDescription] = useState('')
   const [editSort, setEditSort] = useState(0)
   const [isAdding, setIsAdding] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newDescription, setNewDescription] = useState('')
+  const [newEnglishName, setNewEnglishName] = useState('')
+  const [newEnglishDescription, setNewEnglishDescription] = useState('')
+  const [newTurkishName, setNewTurkishName] = useState('')
+  const [newTurkishDescription, setNewTurkishDescription] = useState('')
   const [newSort, setNewSort] = useState(0)
   const [newImageUrl, setNewImageUrl] = useState<string | null>(null)
   const [addingSaving, setAddingSaving] = useState(false)
@@ -28,17 +42,25 @@ export default function CategoriesPage() {
   const [editOriginalImageUrl, setEditOriginalImageUrl] = useState<string | null>(null)
   const [newImageUrlsPendingCleanup, setNewImageUrlsPendingCleanup] = useState<string[]>([])
   const [editImageUrlsPendingCleanup, setEditImageUrlsPendingCleanup] = useState<string[]>([])
+  const [englishByCategoryId, setEnglishByCategoryId] = useState<Record<string, CategoryTranslation>>({})
+  const [turkishByCategoryId, setTurkishByCategoryId] = useState<Record<string, CategoryTranslation>>({})
+  const [newEditorLocale, setNewEditorLocale] = useState<EditorLocale>('ar')
+  const [editEditorLocale, setEditEditorLocale] = useState<EditorLocale>('ar')
 
   const supabase = createClient()
 
   async function fetchCategories() {
     setLoading(true)
-    const { data } = await supabase
-      .from('categories')
-      .select('*')
-      .order('sort_order', { ascending: true })
+    const [categoriesResult, translationsResult] = await Promise.all([
+      supabase.from('categories').select('*').order('sort_order', { ascending: true }),
+      supabase.from('category_translations').select('*').in('locale', ['en', 'tr']),
+    ])
 
-    if (data) setCategories(data)
+    if (categoriesResult.data) setCategories(categoriesResult.data)
+    if (translationsResult.data) {
+      setEnglishByCategoryId(Object.fromEntries(translationsResult.data.filter((translation) => translation.locale === 'en').map((translation) => [translation.category_id, translation])))
+      setTurkishByCategoryId(Object.fromEntries(translationsResult.data.filter((translation) => translation.locale === 'tr').map((translation) => [translation.category_id, translation])))
+    }
     setLoading(false)
   }
 
@@ -56,6 +78,72 @@ export default function CategoriesPage() {
     }
 
     return cleanupError
+  }
+
+  async function saveEnglishTranslation(categoryId: string, name: string, description: string) {
+    const normalizedName = name.trim()
+    if (!normalizedName) {
+      const { error } = await supabase
+        .from('category_translations')
+        .delete()
+        .eq('category_id', categoryId)
+        .eq('locale', 'en')
+      if (!error) {
+        setEnglishByCategoryId((current) => {
+          const next = { ...current }
+          delete next[categoryId]
+          return next
+        })
+      }
+      return error
+    }
+
+    const { data, error } = await supabase
+      .from('category_translations')
+      .upsert({
+        category_id: categoryId,
+        locale: 'en',
+        name: normalizedName,
+        description: description.trim() || null,
+      }, { onConflict: 'category_id,locale' })
+      .select()
+      .single()
+
+    if (data) setEnglishByCategoryId((current) => ({ ...current, [categoryId]: data }))
+    return error
+  }
+
+  async function saveTurkishTranslation(categoryId: string, name: string, description: string) {
+    const normalizedName = name.trim()
+    if (!normalizedName) {
+      const { error } = await supabase
+        .from('category_translations')
+        .delete()
+        .eq('category_id', categoryId)
+        .eq('locale', 'tr')
+      if (!error) {
+        setTurkishByCategoryId((current) => {
+          const next = { ...current }
+          delete next[categoryId]
+          return next
+        })
+      }
+      return error
+    }
+
+    const { data, error } = await supabase
+      .from('category_translations')
+      .upsert({
+        category_id: categoryId,
+        locale: 'tr',
+        name: normalizedName,
+        description: description.trim() || null,
+      }, { onConflict: 'category_id,locale' })
+      .select()
+      .single()
+
+    if (data) setTurkishByCategoryId((current) => ({ ...current, [categoryId]: data }))
+    return error
   }
 
   function handleNewImageChange(url: string | null) {
@@ -123,6 +211,12 @@ export default function CategoriesPage() {
     const cleanupError = await cleanupUnusedImages([newImageUrl, ...newImageUrlsPendingCleanup])
     setIsAdding(false)
     setNewName('')
+    setNewDescription('')
+    setNewEnglishName('')
+    setNewEnglishDescription('')
+    setNewTurkishName('')
+    setNewTurkishDescription('')
+    setNewEditorLocale('ar')
     setNewSort(0)
     setNewImageUrl(null)
     setNewImageUrlsPendingCleanup([])
@@ -158,7 +252,7 @@ export default function CategoriesPage() {
     const nextImageUrl = newImageUrl?.trim() || null
     const { data, error } = await supabase
       .from('categories')
-      .insert({ name: newName, sort_order: newSort, image_url: nextImageUrl })
+      .insert({ name: newName.trim(), description: newDescription.trim() || null, sort_order: newSort, image_url: nextImageUrl })
       .select()
       .single()
 
@@ -170,14 +264,26 @@ export default function CategoriesPage() {
     }
 
     if (data) {
+      const [englishTranslationError, turkishTranslationError] = await Promise.all([
+        saveEnglishTranslation(data.id, newEnglishName, newEnglishDescription),
+        saveTurkishTranslation(data.id, newTurkishName, newTurkishDescription),
+      ])
+      const translationError = englishTranslationError || turkishTranslationError
       const cleanupError = await cleanupUnusedImages(newImageUrlsPendingCleanup.filter(url => url !== nextImageUrl))
       setCategories([...categories, data].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
       setIsAdding(false)
       setNewName('')
+      setNewDescription('')
+      setNewEnglishName('')
+      setNewEnglishDescription('')
+      setNewTurkishName('')
+      setNewTurkishDescription('')
       setNewSort(0)
       setNewImageUrl(null)
       setNewImageUrlsPendingCleanup([])
-      setStatusMessage(cleanupError
+      setStatusMessage(translationError
+        ? 'تمت إضافة القسم، لكن تعذر حفظ إحدى الترجمات: ' + translationError.message
+        : cleanupError
         ? 'تمت إضافة القسم بنجاح، لكن تعذر حذف صورة قديمة من التخزين: ' + cleanupError
         : 'تمت إضافة القسم بنجاح')
     }
@@ -192,7 +298,7 @@ export default function CategoriesPage() {
     const nextImageUrl = editImageUrl?.trim() || null
     const { error } = await supabase
       .from('categories')
-      .update({ name: editName, sort_order: editSort, image_url: nextImageUrl })
+      .update({ name: editName.trim(), description: editDescription.trim() || null, sort_order: editSort, image_url: nextImageUrl })
       .eq('id', id)
 
     if (error) {
@@ -202,18 +308,25 @@ export default function CategoriesPage() {
       return
     }
 
+    const [englishTranslationError, turkishTranslationError] = await Promise.all([
+      saveEnglishTranslation(id, editEnglishName, editEnglishDescription),
+      saveTurkishTranslation(id, editTurkishName, editTurkishDescription),
+    ])
+    const translationError = englishTranslationError || turkishTranslationError
     const cleanupCandidates = [
       editOriginalImageUrl && editOriginalImageUrl !== nextImageUrl ? editOriginalImageUrl : null,
       ...editImageUrlsPendingCleanup.filter(url => url !== nextImageUrl),
     ]
     const cleanupError = await cleanupUnusedImages(cleanupCandidates)
 
-    setCategories(categories.map(c => c.id === id ? { ...c, name: editName, sort_order: editSort, image_url: nextImageUrl } : c).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
+    setCategories(categories.map(c => c.id === id ? { ...c, name: editName.trim(), description: editDescription.trim() || null, sort_order: editSort, image_url: nextImageUrl } : c).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
     setIsEditing(null)
     setEditOriginalImageUrl(null)
     setEditImageUrlsPendingCleanup([])
     setSavingCategoryId(null)
-    setStatusMessage(cleanupError
+    setStatusMessage(translationError
+      ? 'تم حفظ القسم، لكن تعذر حفظ إحدى الترجمات: ' + translationError.message
+      : cleanupError
       ? 'تم حفظ القسم بنجاح، لكن تعذر حذف الصورة القديمة من التخزين: ' + cleanupError
       : 'تم حفظ القسم بنجاح')
   }
@@ -253,30 +366,48 @@ export default function CategoriesPage() {
   }
 
   function startEdit(c: Category) {
+    setIsAdding(false)
     setIsEditing(c.id)
     setEditName(c.name)
+    setEditDescription(c.description || '')
+    setEditEnglishName(englishByCategoryId[c.id]?.name || '')
+    setEditEnglishDescription(englishByCategoryId[c.id]?.description || '')
+    setEditTurkishName(turkishByCategoryId[c.id]?.name || '')
+    setEditTurkishDescription(turkishByCategoryId[c.id]?.description || '')
     setEditSort(c.sort_order || 0)
     setEditImageUrl(c.image_url || null)
     setEditOriginalImageUrl(c.image_url || null)
     setEditImageUrlsPendingCleanup([])
+    setEditEditorLocale('ar')
   }
 
-  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">جاري التحميل...</div>
+  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">{tx('جاري التحميل...')}</div>
+
+  const newLocalizedName = newEditorLocale === 'ar' ? newName : newEditorLocale === 'en' ? newEnglishName : newTurkishName
+  const newLocalizedDescription = newEditorLocale === 'ar' ? newDescription : newEditorLocale === 'en' ? newEnglishDescription : newTurkishDescription
+  const editLocalizedName = editEditorLocale === 'ar' ? editName : editEditorLocale === 'en' ? editEnglishName : editTurkishName
+  const editLocalizedDescription = editEditorLocale === 'ar' ? editDescription : editEditorLocale === 'en' ? editEnglishDescription : editTurkishDescription
+  const contentLanguageLabel = (locale: EditorLocale) => locale === 'ar' ? 'العربية' : locale === 'en' ? 'English' : 'Türkçe'
+  const contentNameLabel = (locale: EditorLocale) => locale === 'ar' ? 'اسم القسم بالعربية' : locale === 'en' ? 'English category name' : 'Türkçe kategori adı'
+  const contentDescriptionLabel = (locale: EditorLocale) => locale === 'ar' ? 'الوصف بالعربية' : locale === 'en' ? 'English description' : 'Türkçe açıklama'
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-brand-text">الأقسام</h1>
-          <p className="text-sm leading-6 text-brand-brown">إدارة أقسام المنيو وصورها وترتيب ظهورها.</p>
+          <h1 className="text-2xl font-bold text-brand-text">{tx('الأقسام')}</h1>
+          <p className="text-sm leading-6 text-brand-brown">{tx('إدارة أقسام المنيو وصورها وترتيب ظهورها.')}</p>
         </div>
         <button
           type="button"
-          onClick={() => setIsAdding(true)}
+          onClick={() => {
+            setIsEditing(null)
+            setIsAdding(true)
+          }}
           className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-burgundy px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark sm:w-auto"
         >
           <Plus className="h-5 w-5" />
-          إضافة قسم
+          {tx('إضافة قسم')}
         </button>
       </div>
 
@@ -287,60 +418,150 @@ export default function CategoriesPage() {
       )}
 
       {isAdding && (
-        <form onSubmit={handleAdd} className="flex flex-col gap-5 rounded-xl border border-brand-border bg-white p-5 shadow-sm sm:p-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_8rem]">
-            <div className="min-w-0">
-              <label className="mb-2 block text-sm font-bold text-brand-text">الاسم</label>
-              <input required type="text" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={newName} onChange={e => setNewName(e.target.value)} />
+        <form onSubmit={handleAdd} className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-brand-border bg-brand-cream/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div>
+              <h2 className="text-lg font-bold text-brand-text">{tx('إضافة قسم جديد')}</h2>
+              <p className="mt-1 text-sm text-brand-brown">{tx('أدخل العربية أولاً، ثم أضف الإنجليزية أو التركية عند توفرها.')}</p>
             </div>
-            <div className="min-w-0">
-              <label className="mb-2 block text-sm font-bold text-brand-text">الترتيب</label>
-              <input type="number" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={newSort} onChange={e => setNewSort(parseInt(e.target.value) || 0)} />
+            <label className="flex min-h-11 items-center gap-2 rounded-xl border border-brand-border bg-white px-3 text-sm font-bold text-brand-text">
+              <Languages className="h-4 w-4 text-brand-burgundy" />
+              <span>{tx('لغة المحتوى')}</span>
+              <select value={newEditorLocale} onChange={e => setNewEditorLocale(e.target.value as EditorLocale)} className="bg-transparent outline-none" dir="ltr">
+                <option value="ar">العربية</option>
+                <option value="en">English</option>
+                <option value="tr">Türkçe</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="min-w-0" dir={newEditorLocale === 'ar' ? 'rtl' : 'ltr'}>
+              <label className="mb-2 block text-sm font-bold text-brand-text">{contentNameLabel(newEditorLocale)}</label>
+              <input
+                required={newEditorLocale === 'ar'}
+                type="text"
+                className="min-h-12 w-full rounded-xl border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10"
+                value={newLocalizedName}
+                onChange={e => newEditorLocale === 'ar' ? setNewName(e.target.value) : newEditorLocale === 'en' ? setNewEnglishName(e.target.value) : setNewTurkishName(e.target.value)}
+                placeholder={newEditorLocale === 'ar' ? 'مثال: وجبات الدجاج' : newEditorLocale === 'en' ? 'Example: Chicken meals' : 'Örnek: Tavuk yemekleri'}
+              />
+              <label className="mb-2 mt-4 block text-sm font-bold text-brand-text">{contentDescriptionLabel(newEditorLocale)}</label>
+              <textarea
+                className="w-full rounded-xl border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10"
+                rows={4}
+                value={newLocalizedDescription}
+                onChange={e => newEditorLocale === 'ar' ? setNewDescription(e.target.value) : newEditorLocale === 'en' ? setNewEnglishDescription(e.target.value) : setNewTurkishDescription(e.target.value)}
+              />
+              {newEditorLocale !== 'ar' && !newName.trim() && (
+                <p className="mt-2 text-xs font-medium text-amber-700" dir="ltr">{tx('يجب إدخال الاسم العربي قبل حفظ القسم.')}</p>
+              )}
+            </div>
+            <div className="min-w-0 space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-bold text-brand-text">{tx('الترتيب')}</label>
+                <input type="number" className="min-h-12 w-full rounded-xl border border-brand-border px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={newSort} onChange={e => setNewSort(parseInt(e.target.value) || 0)} />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-bold text-brand-text">{tx('صورة القسم')}</label>
+                <ImageUploader
+                  value={newImageUrl}
+                  onChange={handleNewImageChange}
+                  onClear={clearNewCategoryImage}
+                  folder="categories"
+                  helperText={tx('تظهر هذه الصورة للزبائن في قائمة الأقسام.')}
+                />
+              </div>
             </div>
           </div>
-          <div>
-            <label className="mb-2 block text-sm font-bold text-brand-text">صورة القسم</label>
-            <ImageUploader
-              value={newImageUrl}
-              onChange={handleNewImageChange}
-              onClear={clearNewCategoryImage}
-              folder="categories"
-              helperText="ستظهر هذه الصورة في الصفحة الرئيسية للأقسام (المقاس المقترح: 1200 × 1200 بكسل)"
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:flex sm:justify-end">
-            <button type="button" onClick={cancelAdd} className="min-h-11 rounded-xl border border-brand-border bg-white px-4 py-2 text-sm font-bold text-brand-brown hover:bg-brand-cream sm:w-auto">إلغاء</button>
-            <button type="submit" disabled={addingSaving} className="min-h-11 rounded-xl bg-brand-burgundy px-4 py-2 text-sm font-bold text-white hover:bg-brand-burgundy-dark disabled:opacity-50 sm:w-auto">{addingSaving ? 'جاري الحفظ...' : 'حفظ القسم'}</button>
+
+          <div className="flex flex-col-reverse gap-3 border-t border-brand-border bg-brand-cream/30 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+            <button type="button" onClick={cancelAdd} className="min-h-11 rounded-xl border border-brand-border bg-white px-5 py-2 text-sm font-bold text-brand-brown hover:bg-brand-cream">{tx('إلغاء')}</button>
+            <button type="submit" disabled={addingSaving || !newName.trim()} className="min-h-11 rounded-xl bg-brand-burgundy px-5 py-2 text-sm font-bold text-white hover:bg-brand-burgundy-dark disabled:cursor-not-allowed disabled:opacity-50">{addingSaving ? tx('جاري الحفظ...') : tx('حفظ القسم')}</button>
           </div>
         </form>
       )}
+
+      {isEditing && (() => {
+        const category = categories.find(current => current.id === isEditing)
+        if (!category) return null
+
+        return (
+          <section className="overflow-hidden rounded-2xl border border-brand-burgundy/20 bg-white shadow-sm">
+            <div className="flex flex-col gap-4 border-b border-brand-border bg-brand-cream/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-bold text-brand-text">{tx('تعديل القسم: {name}', { name: category.name })}</h2>
+                <p className="mt-1 text-sm text-brand-brown">{tx('لغة واحدة ظاهرة في كل مرة لتبقى البيانات واضحة.')}</p>
+              </div>
+              <label className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-brand-border bg-white px-3 text-sm font-bold text-brand-text">
+                <Languages className="h-4 w-4 text-brand-burgundy" />
+                <span>{tx('لغة المحتوى')}</span>
+                <select value={editEditorLocale} onChange={e => setEditEditorLocale(e.target.value as EditorLocale)} className="bg-transparent outline-none" dir="ltr">
+                <option value="ar">العربية</option>
+                <option value="en">English</option>
+                <option value="tr">Türkçe</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+              <div className="min-w-0" dir={editEditorLocale === 'ar' ? 'rtl' : 'ltr'}>
+                <label className="mb-2 block text-sm font-bold text-brand-text">{contentNameLabel(editEditorLocale)}</label>
+                <input
+                  type="text"
+                  className="min-h-12 w-full rounded-xl border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10"
+                  value={editLocalizedName}
+                  onChange={e => editEditorLocale === 'ar' ? setEditName(e.target.value) : editEditorLocale === 'en' ? setEditEnglishName(e.target.value) : setEditTurkishName(e.target.value)}
+                  placeholder={editEditorLocale === 'ar' ? 'اسم القسم' : editEditorLocale === 'en' ? 'English category name' : 'Türkçe kategori adı'}
+                />
+                <label className="mb-2 mt-4 block text-sm font-bold text-brand-text">{contentDescriptionLabel(editEditorLocale)}</label>
+                <textarea
+                  className="w-full rounded-xl border border-brand-border px-3 py-2 outline-none transition-colors focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10"
+                  rows={4}
+                  value={editLocalizedDescription}
+                  onChange={e => editEditorLocale === 'ar' ? setEditDescription(e.target.value) : editEditorLocale === 'en' ? setEditEnglishDescription(e.target.value) : setEditTurkishDescription(e.target.value)}
+                />
+                {editEditorLocale !== 'ar' && !editLocalizedName.trim() && (
+                  <p className="mt-2 text-xs font-medium text-brand-brown">Blank {contentLanguageLabel(editEditorLocale)} fields use the Arabic content in the customer menu.</p>
+                )}
+              </div>
+              <div className="min-w-0 space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-brand-text">{tx('الترتيب')}</label>
+                  <input type="number" className="min-h-12 w-full rounded-xl border border-brand-border px-3 py-2 outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={editSort} onChange={e => setEditSort(parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-brand-text">{tx('صورة القسم')}</label>
+                  <ImageUploader value={editImageUrl} onChange={handleEditImageChange} onClear={() => clearEditingCategoryImage(category.id)} folder="categories" helperText={tx('تظهر هذه الصورة للزبائن في قائمة الأقسام.')} />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-brand-border bg-brand-cream/30 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+              <button type="button" onClick={cancelEdit} className="min-h-11 rounded-xl border border-brand-border bg-white px-5 py-2 text-sm font-bold text-brand-brown hover:bg-brand-cream">{tx('إلغاء')}</button>
+              <button type="button" disabled={savingCategoryId === category.id || !editName.trim()} onClick={() => handleUpdate(category.id)} className="min-h-11 rounded-xl bg-brand-burgundy px-5 py-2 text-sm font-bold text-white hover:bg-brand-burgundy-dark disabled:cursor-not-allowed disabled:opacity-50">{savingCategoryId === category.id ? tx('جاري الحفظ...') : tx('حفظ التغييرات')}</button>
+            </div>
+          </section>
+        )
+      })()}
 
       <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-sm">
         <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الصورة</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاسم</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الترتيب</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('الصورة')}</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('الاسم')}</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('الترجمات')}</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('الترتيب')}</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('الإجراءات')}</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {categories.map((category) => (
                 <tr key={category.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {isEditing === category.id ? (
-                      <div className="w-32">
-                        <ImageUploader
-                          value={editImageUrl}
-                          onChange={handleEditImageChange}
-                          onClear={() => clearEditingCategoryImage(category.id)}
-                          folder="categories"
-                        />
-                      </div>
-                    ) : (
-                      category.image_url ? (
+                    {category.image_url ? (
                         <div className="relative w-12 h-12 rounded bg-gray-100 border overflow-hidden">
                           <Image src={category.image_url} alt={category.name} fill className="object-cover" />
                         </div>
@@ -348,41 +569,29 @@ export default function CategoriesPage() {
                         <div className="w-12 h-12 rounded bg-gray-100 border flex items-center justify-center">
                           <ImageIcon className="w-5 h-5 text-gray-400" />
                         </div>
-                      )
-                    )}
+                      )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {isEditing === category.id ? (
-                      <input type="text" className="w-full px-2 py-1 border rounded" value={editName} onChange={e => setEditName(e.target.value)} />
-                    ) : (
-                      <span className="text-sm font-medium text-gray-900">{category.name}</span>
-                    )}
+                  <td className="px-6 py-4">
+                    <span className="block text-sm font-medium text-gray-900">{category.name}</span>
+                    {category.description && <span className="mt-1 block max-w-md truncate text-xs text-gray-500">{category.description}</span>}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {isEditing === category.id ? (
-                      <input type="number" className="w-24 px-2 py-1 border rounded" value={editSort} onChange={e => setEditSort(parseInt(e.target.value) || 0)} />
-                    ) : (
-                      <span className="text-sm text-gray-500">{category.sort_order}</span>
-                    )}
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${(englishByCategoryId[category.id]?.name || turkishByCategoryId[category.id]?.name) ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {englishByCategoryId[category.id]?.name && turkishByCategoryId[category.id]?.name ? 'English + Türkçe' : englishByCategoryId[category.id]?.name ? tx('English جاهزة') : turkishByCategoryId[category.id]?.name ? tx('Türkçe hazır') : tx('العربية فقط')}
+                    </span>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap"><span className="text-sm text-gray-500">{category.sort_order}</span></td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {isEditing === category.id ? (
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => handleUpdate(category.id)} className="text-green-600 hover:text-green-900">حفظ</button>
-                        <button type="button" onClick={cancelEdit} className="text-gray-600 hover:text-gray-900">إلغاء</button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-4">
-                        <button type="button" onClick={() => startEdit(category)} className="text-brand-burgundy hover:text-brand-burgundy-dark"><Edit2 className="w-4 h-4" /></button>
-                        <button type="button" onClick={() => handleDelete(category.id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    )}
+                    <div className="flex gap-4">
+                      <button type="button" onClick={() => startEdit(category)} className="text-brand-burgundy hover:text-brand-burgundy-dark" aria-label={`تعديل ${category.name}`}><Edit2 className="w-4 h-4" /></button>
+                      <button type="button" onClick={() => handleDelete(category.id)} className="text-red-600 hover:text-red-900" aria-label={`حذف ${category.name}`}><Trash2 className="w-4 h-4" /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
               {categories.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">لا يوجد أقسام</td>
+                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">{tx('لا يوجد أقسام')}</td>
                 </tr>
               )}
             </tbody>
@@ -393,31 +602,7 @@ export default function CategoriesPage() {
         <div className="block divide-y divide-brand-border md:hidden">
           {categories.map((category) => (
             <div key={category.id} className="flex flex-col gap-4 bg-white p-4">
-              {isEditing === category.id ? (
-                <div className="flex flex-col gap-3">
-                  <div className="w-full">
-                    <ImageUploader
-                      value={editImageUrl}
-                      onChange={handleEditImageChange}
-                      onClear={() => clearEditingCategoryImage(category.id)}
-                      folder="categories"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-bold text-gray-600">الاسم</label>
-                    <input type="text" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={editName} onChange={e => setEditName(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-bold text-gray-600">الترتيب</label>
-                    <input type="number" className="min-h-11 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-brand-burgundy focus:ring-2 focus:ring-brand-burgundy/10" value={editSort} onChange={e => setEditSort(parseInt(e.target.value) || 0)} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 mt-3">
-                    <button type="button" disabled={savingCategoryId === category.id} onClick={() => handleUpdate(category.id)} className="min-h-11 rounded-xl bg-brand-burgundy py-3 text-sm font-bold text-white shadow-sm transition-colors disabled:opacity-50">{savingCategoryId === category.id ? 'جاري الحفظ...' : 'حفظ'}</button>
-                    <button type="button" onClick={cancelEdit} className="min-h-11 rounded-xl border border-gray-200 bg-gray-100 py-3 text-sm font-bold text-gray-700 transition-colors">إلغاء</button>
-                  </div>
-                </div>
-              ) : (
-                <>
+              <>
                   <div className="flex items-center gap-3">
                     <div className="shrink-0">
                       {category.image_url ? (
@@ -432,25 +617,24 @@ export default function CategoriesPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="break-words text-base font-bold leading-6 text-gray-900">{category.name}</h3>
-                      <div className="text-sm text-gray-500 mt-1">الترتيب: {category.sort_order}</div>
+                      <div className="mt-1 flex items-center gap-2 text-sm text-gray-500"><span>{tx('الترتيب: {count}', { count: category.sort_order || 0 })}</span><span className={`rounded-full px-2 py-0.5 text-xs font-bold ${(englishByCategoryId[category.id]?.name || turkishByCategoryId[category.id]?.name) ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{englishByCategoryId[category.id]?.name && turkishByCategoryId[category.id]?.name ? 'English + Türkçe' : englishByCategoryId[category.id]?.name ? tx('English جاهزة') : turkishByCategoryId[category.id]?.name ? tx('Türkçe hazır') : tx('العربية فقط')}</span></div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <button type="button" onClick={() => startEdit(category)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-3 text-brand-burgundy shadow-sm transition-colors hover:bg-gray-100">
                       <Edit2 className="w-4 h-4" />
-                      <span className="text-sm font-bold">تعديل</span>
+                      <span className="text-sm font-bold">{tx('تعديل')}</span>
                     </button>
                     <button type="button" onClick={() => handleDelete(category.id)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 py-3 text-red-600 shadow-sm transition-colors hover:bg-red-100">
                       <Trash2 className="w-4 h-4" />
-                      <span className="text-sm font-bold">حذف</span>
+                      <span className="text-sm font-bold">{tx('حذف')}</span>
                     </button>
                   </div>
-                </>
-              )}
+              </>
             </div>
           ))}
           {categories.length === 0 && (
-            <div className="p-8 text-center text-sm text-brand-brown">لا يوجد أقسام حتى الآن.</div>
+            <div className="p-8 text-center text-sm text-brand-brown">{tx('لا يوجد أقسام حتى الآن.')}</div>
           )}
         </div>
       </div>

@@ -1,7 +1,9 @@
 import { MapPin, Phone } from 'lucide-react'
 import { publicFooterConfig } from '@/config/publicFooter'
+import { useLocale } from '@/i18n/LocaleProvider'
 
 export default function PublicFooter({ settings }: { settings?: { whatsapp?: string | null } }) {
+  const { t } = useLocale()
   const phone = publicFooterConfig.phone || settings?.whatsapp || ''
   
   return (
@@ -53,13 +55,13 @@ export default function PublicFooter({ settings }: { settings?: { whatsapp?: str
 
       {/* Slogan */}
       <p className="text-brand-burgundy font-bold text-[15px] mb-6">
-        مطعم أصالة يقدم أشهى وألذ الوجبات اليمنية
+        {t('restaurantSlogan')}
       </p>
 
       {/* Copyright */}
       <div className="text-[12px] text-brand-brown/70 space-y-1.5">
-        <p>© 2026 جميع الحقوق محفوظة</p>
-        <p>تصميم وتطوير شركة Power</p>
+        <p>{t('copyright')}</p>
+        <p>{t('madeByPower')}</p>
       </div>
     </footer>
   )

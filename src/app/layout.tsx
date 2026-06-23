@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -21,9 +22,12 @@ export default function RootLayout({
     <html
       lang="ar"
       dir="rtl"
+      suppressHydrationWarning
       className={`${cairo.variable} font-sans h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#fbf9f7] text-gray-900">{children}</body>
+      <body className="min-h-full flex flex-col bg-[#fbf9f7] text-gray-900">
+        <LocaleProvider>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

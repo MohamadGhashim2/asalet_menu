@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { LocalizedText } from '@/i18n/LocalizedText'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -10,17 +11,17 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold text-brand-text sm:text-3xl">مرحباً بك في لوحة الإدارة</h1>
-        <p className="text-sm leading-6 text-brand-brown">ملخص سريع لمحتوى المنيو الحالي.</p>
+        <h1 className="text-2xl font-bold text-brand-text sm:text-3xl"><LocalizedText id="welcomeAdmin" /></h1>
+        <p className="text-sm leading-6 text-brand-brown"><LocalizedText id="dashboardSummary" /></p>
       </div>
       
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border border-brand-border bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-bold text-brand-brown">إجمالي الأقسام</h2>
+          <h2 className="text-sm font-bold text-brand-brown"><LocalizedText id="totalCategories" /></h2>
           <p className="mt-2 text-3xl font-bold text-brand-text">{categoriesCount || 0}</p>
         </div>
         <div className="rounded-xl border border-brand-border bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-bold text-brand-brown">إجمالي المنتجات</h2>
+          <h2 className="text-sm font-bold text-brand-brown"><LocalizedText id="totalProducts" /></h2>
           <p className="mt-2 text-3xl font-bold text-brand-text">{itemsCount || 0}</p>
         </div>
       </div>

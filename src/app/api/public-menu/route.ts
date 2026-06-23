@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server'
 import { getPublicMenuData, PUBLIC_MENU_CACHE_CONTROL } from '@/lib/public-menu-data'
+import { resolveCatalogLocale } from '@/lib/catalog-locale'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const menuData = await getPublicMenuData()
+    const locale = resolveCatalogLocale(new URL(request.url).searchParams.get('locale'))
+    const menuData = await getPublicMenuData(locale)
 
     return NextResponse.json(menuData, {
       headers: {
         'Cache-Control': PUBLIC_MENU_CACHE_CONTROL,
+        'Content-Language': locale,
       },
     })
   } catch (error) {

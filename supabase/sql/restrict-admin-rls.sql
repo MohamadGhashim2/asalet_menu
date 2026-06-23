@@ -1,3 +1,0 @@
--- DEPRECATED: use supabase/sql/harden-production-resources.sql instead.
--- The old version of this script targeted stale table names and did not remove
--- broad authenticated policies. It intentionally performs no changes now.

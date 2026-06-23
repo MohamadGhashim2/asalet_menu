@@ -7,6 +7,7 @@ import { Plus, Edit2, Trash2, Folder, Image as ImageIcon, ChevronDown, ChevronLe
 import Link from 'next/link'
 import Image from 'next/image'
 import { deleteMenuImageIfUnused } from '@/lib/storage-images'
+import { useAdminText } from '@/i18n/admin-text'
 
 type MenuItem = Database['public']['Tables']['menu_items']['Row']
 type Category = Database['public']['Tables']['categories']['Row']
@@ -15,7 +16,7 @@ type MenuItemWithCategory = MenuItem & { categories: Pick<Category, 'name'> | nu
 const arabicCollator = new Intl.Collator('ar')
 
 function getCategoryName(item: MenuItemWithCategory) {
-  return item.categories?.name || 'بدون قسم'
+  return item.categories?.name || ''
 }
 
 function groupItemsByCategory(items: MenuItemWithCategory[]) {
@@ -34,13 +35,14 @@ function groupItemsByCategory(items: MenuItemWithCategory[]) {
 
 function sortCategoryNames(categoryNames: string[]) {
   return [...categoryNames].sort((a, b) => {
-    if (a === 'بدون قسم') return 1
-    if (b === 'بدون قسم') return -1
+    if (a === '') return 1
+    if (b === '') return -1
     return arabicCollator.compare(a, b)
   })
 }
 
 export default function ItemsPage() {
+  const tx = useAdminText()
   const [items, setItems] = useState<MenuItemWithCategory[]>([])
   const [openCategoryIds, setOpenCategoryIds] = useState<string[]>([])
   const [accordionInitialized, setAccordionInitialized] = useState(false)
@@ -75,7 +77,7 @@ export default function ItemsPage() {
   }, [])
 
   async function handleDelete(id: string) {
-    if (!confirm('هل أنت متأكد من حذف هذا المنتج؟ سيتم حذف جميع الخيارات التابعة له!')) return
+    if (!confirm(tx('هل أنت متأكد من حذف هذا المنتج؟ سيتم حذف جميع الخيارات التابعة له!'))) return
 
     const itemToDelete = items.find(item => item.id === id)
     setStatusMessage('')
@@ -87,12 +89,12 @@ export default function ItemsPage() {
 
       if (cleanupResult.error) {
         console.warn('Storage image cleanup failed after product delete:', cleanupResult.error)
-        setStatusMessage('تم حذف المنتج، لكن تعذر حذف الصورة من التخزين: ' + cleanupResult.error)
+        setStatusMessage(tx('تم حذف المنتج، لكن تعذر حذف الصورة من التخزين: {message}', { message: cleanupResult.error }))
       } else {
-        setStatusMessage('تم حذف المنتج بنجاح')
+        setStatusMessage(tx('تم حذف المنتج بنجاح'))
       }
     } else {
-      setStatusMessage('حدث خطأ أثناء حذف المنتج: ' + error.message)
+      setStatusMessage(tx('حدث خطأ أثناء حذف المنتج: {message}', { message: error.message }))
     }
   }
 
@@ -116,21 +118,21 @@ export default function ItemsPage() {
     setOpenCategoryIds([])
   }
 
-  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">جاري التحميل...</div>
+  if (loading) return <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">{tx('جاري التحميل...')}</div>
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-brand-text">المنتجات</h1>
-          <p className="text-sm leading-6 text-brand-brown">المنتجات مرتبة حسب القسم لتسهيل تعديل المنيو اليومي.</p>
+          <h1 className="text-2xl font-bold text-brand-text">{tx('المنتجات')}</h1>
+          <p className="text-sm leading-6 text-brand-brown">{tx('المنتجات مرتبة حسب القسم لتسهيل تعديل المنيو اليومي.')}</p>
         </div>
         <Link
           href="/asalaadmin26/items/new"
           className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-burgundy px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark sm:w-auto"
         >
           <Plus className="h-5 w-5" />
-          إضافة منتج
+          {tx('إضافة منتج')}
         </Link>
       </div>
 
@@ -142,7 +144,7 @@ export default function ItemsPage() {
 
       {Object.keys(itemsByCategory).length === 0 ? (
         <div className="rounded-xl border border-dashed border-brand-border bg-white py-12 text-center">
-          <p className="text-sm text-brand-brown">لا يوجد منتجات حتى الآن.</p>
+          <p className="text-sm text-brand-brown">{tx('لا يوجد منتجات حتى الآن.')}</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -153,14 +155,14 @@ export default function ItemsPage() {
                 onClick={openAllCategories}
                 className="min-h-10 rounded-lg border border-brand-border bg-white px-4 py-2 text-sm font-bold text-brand-burgundy transition-colors hover:bg-brand-cream"
               >
-                فتح الكل
+                {tx('فتح الكل')}
               </button>
               <button
                 type="button"
                 onClick={closeAllCategories}
                 className="min-h-10 rounded-lg border border-brand-border bg-white px-4 py-2 text-sm font-bold text-brand-brown transition-colors hover:bg-brand-cream"
               >
-                إغلاق الكل
+                {tx('إغلاق الكل')}
               </button>
             </div>
           )}
@@ -179,9 +181,9 @@ export default function ItemsPage() {
                 className="flex min-h-16 w-full items-center gap-3 border-b border-brand-border bg-brand-cream px-4 py-4 text-right transition-colors hover:bg-brand-beige/70 sm:px-6"
               >
                 <Folder className="h-5 w-5 shrink-0 text-brand-burgundy" />
-                <span className="min-w-0 flex-1 break-words text-lg font-bold leading-7 text-brand-burgundy">{catName}</span>
+                <span className="min-w-0 flex-1 break-words text-lg font-bold leading-7 text-brand-burgundy">{catName || tx('بدون قسم')}</span>
                 <span className="shrink-0 rounded-full border border-brand-border bg-white px-2.5 py-1 text-xs font-bold text-brand-brown sm:text-sm">
-                  {catItems.length} منتجات
+                  {tx('{count} منتجات', { count: catItems.length })}
                 </span>
                 {isOpen ? (
                   <ChevronDown className="h-5 w-5 shrink-0 text-brand-burgundy" aria-hidden="true" />
@@ -195,11 +197,11 @@ export default function ItemsPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الصورة</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاسم</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">السعر الأساسي</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('الصورة')}</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('الاسم')}</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('السعر الأساسي')}</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('الحالة')}</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{tx('الإجراءات')}</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -220,11 +222,11 @@ export default function ItemsPage() {
                           <span className="block max-w-xs break-words text-sm font-medium text-gray-900">{item.name}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-500">{item.base_price !== null ? item.base_price : 'حسب الخيار'}</span>
+                          <span className="text-sm text-gray-500">{item.base_price !== null ? item.base_price : tx('حسب الخيار')}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {item.is_available ? 'متاح' : 'غير متاح'}
+                            {item.is_available ? tx('متاح') : tx('غير متاح')}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -261,22 +263,22 @@ export default function ItemsPage() {
                         <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
                           <h3 className="min-w-0 flex-1 break-words text-base font-bold leading-6 text-gray-900">{item.name}</h3>
                           <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {item.is_available ? 'متاح' : 'غير متاح'}
+                            {item.is_available ? tx('متاح') : tx('غير متاح')}
                           </span>
                         </div>
                         <div className="text-sm font-medium text-gray-500">
-                          {item.base_price !== null ? `${item.base_price} ر.س` : 'حسب الخيار'}
+                          {item.base_price !== null ? `${item.base_price} ر.س` : tx('حسب الخيار')}
                         </div>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 mt-3">
                       <Link href={`/asalaadmin26/items/${item.id}`} className="flex justify-center items-center gap-2 bg-gray-50 hover:bg-gray-100 text-brand-burgundy py-3 rounded-xl border border-gray-200 transition-colors shadow-sm">
                         <Edit2 className="w-4 h-4" />
-                        <span className="text-sm font-bold">تعديل</span>
+                        <span className="text-sm font-bold">{tx('تعديل')}</span>
                       </Link>
                       <button type="button" onClick={() => handleDelete(item.id)} className="flex justify-center items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 py-3 rounded-xl border border-red-100 transition-colors shadow-sm">
                         <Trash2 className="w-4 h-4" />
-                        <span className="text-sm font-bold">حذف</span>
+                        <span className="text-sm font-bold">{tx('حذف')}</span>
                       </button>
                     </div>
                   </div>

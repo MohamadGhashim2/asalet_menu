@@ -21,6 +21,7 @@ The QR Menu MVP has been implemented as requested.
 ## Next Steps
 - Execute the SQL schema (`supabase/sql/schema.sql`) in the Supabase project.
 - For an existing Supabase project, replace `admin@admin.com` with the real admin email in `supabase/sql/harden-production-resources.sql`, review it, and run it once from the Supabase SQL editor. This adds read-path indexes and replaces earlier permissive policies with active-read/admin-write policies.
+- To enable English and Turkish catalog content, replace `admin@admin.com` with that same real admin email in `supabase/sql/add-catalog-translations.sql`, review it, and run it once from the Supabase SQL editor. Arabic remains the source data; English and Turkish fields are optional and automatically fall back to Arabic when blank.
 - Execute `supabase/sql/clear-legacy-menu-assets-image-urls.sql` in your Supabase SQL editor to clean up legacy image references.
 - Configure environment variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_ADMIN_LOGIN_EMAIL`.
 - Create the `menu-images` bucket in Supabase Storage.
@@ -56,6 +57,7 @@ Run the audit periodically, especially after bulk menu edits. Keep the delete st
 
 ## Public Menu Cache And Vercel Firewall
 - Public customers load one cached payload from `/api/public-menu`. The response is fresh at the CDN for 5 minutes and can be served stale while revalidating for 24 hours.
+- The public menu fetches `/api/public-menu?locale=ar`, `locale=en`, or `locale=tr`; each locale has an independent CDN and session-storage cache entry.
 - Recommended Vercel Firewall rate limits:
   - `/asalaadmin26/login`: 10 requests per 1 minute per IP.
   - `/asalaadmin26/*`: 120 requests per 1 minute per IP.

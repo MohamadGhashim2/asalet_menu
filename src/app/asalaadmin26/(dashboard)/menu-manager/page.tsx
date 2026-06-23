@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/supabase'
 import { uploadMenuImage } from '@/lib/admin-image-upload'
 import { deleteMenuImageIfUnused, deleteMenuImagesIfUnused } from '@/lib/storage-images'
+import { useAdminText } from '@/i18n/admin-text'
 
 type Category = Database['public']['Tables']['categories']['Row']
 type MenuItem = Database['public']['Tables']['menu_items']['Row']
@@ -54,8 +55,8 @@ const getValidImageUrl = (url: string | null | undefined): string | null => {
   return url
 }
 
-function formatPrice(item: MenuItem, currency: string) {
-  if (item.base_price === null) return 'اختر النوع'
+function formatPrice(item: MenuItem, currency: string, noPriceLabel: string) {
+  if (item.base_price === null) return noPriceLabel
   return `${Number.isInteger(item.base_price) ? item.base_price : item.base_price.toFixed(2)} ${currency}`
 }
 
@@ -124,6 +125,7 @@ function EmptyImage({ label }: { label?: string }) {
 }
 
 export default function MenuManagerPage() {
+  const tx = useAdminText()
   const router = useRouter()
   const supabase = createClient()
 
@@ -654,7 +656,7 @@ export default function MenuManagerPage() {
   if (loading) {
     return (
       <div className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-brown">
-        جاري تحميل إدارة المنيو...
+        {tx('جاري التحميل...')}
       </div>
     )
   }
@@ -663,14 +665,14 @@ export default function MenuManagerPage() {
     <div className="w-full max-w-full space-y-6 pb-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
-          <h1 className="break-words text-2xl font-bold text-brand-text">إدارة بصرية للمنيو</h1>
+          <h1 className="break-words text-2xl font-bold text-brand-text">{tx('إدارة بصرية للمنيو')}</h1>
           <p className="max-w-3xl text-sm leading-6 text-brand-brown">
-            رتب الأقسام والمنتجات من واجهة قريبة من شكل المنيو للزبون، مع بقاء صفحات التعديل التفصيلية كما هي.
+            {tx('رتب الأقسام والمنتجات من واجهة قريبة من شكل المنيو للزبون، مع بقاء صفحات التعديل التفصيلية كما هي.')}
           </p>
         </div>
         {hasUnsavedChanges && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
-            لديك تغييرات غير محفوظة
+            {tx('لديك تغييرات غير محفوظة')}
           </div>
         )}
       </header>
@@ -686,9 +688,9 @@ export default function MenuManagerPage() {
       <div className="flex items-start gap-3 rounded-xl border border-brand-border bg-brand-cream/60 p-4 text-sm leading-6 text-brand-brown">
         <ImageIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand-gold" />
         <div>
-          <p className="font-bold text-brand-text">المقاس المقترح: 1200 × 1200 بكسل</p>
-          <p>يفضل رفع صورة مربعة وواضحة</p>
-          <p>سيتم ضغط الصورة وتحويلها إلى WebP قبل الرفع</p>
+          <p className="font-bold text-brand-text">{tx('المقاس المقترح: 1200 × 1200 بكسل')}</p>
+          <p>{tx('يفضل رفع صورة مربعة وواضحة')}</p>
+          <p>{tx('سيتم ضغط الصورة وتحويلها إلى WebP قبل الرفع')}</p>
         </div>
       </div>
 
@@ -708,10 +710,10 @@ export default function MenuManagerPage() {
           <div className="min-w-0 space-y-1">
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-brand-gold" />
-              <h2 className="text-xl font-bold text-brand-text">المنتجات المميزة</h2>
+              <h2 className="text-xl font-bold text-brand-text">{tx('المنتجات المميزة')}</h2>
             </div>
             <p className="text-sm leading-6 text-brand-brown">
-              تظهر هنا مرة واحدة فقط بدون حركة تلقائية. ترتيبها يستخدم حقل ترتيب المنتج الحالي.
+              {tx('تظهر هنا مرة واحدة فقط بدون حركة تلقائية. ترتيبها يستخدم حقل ترتيب المنتج الحالي.')}
             </p>
           </div>
           <button
@@ -721,13 +723,13 @@ export default function MenuManagerPage() {
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-burgundy px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {savingFeatured ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            حفظ ترتيب المميزة
+            {tx('حفظ ترتيب المميزة')}
           </button>
         </div>
 
         {featuredItems.length === 0 ? (
           <div className="rounded-xl border border-dashed border-brand-border bg-brand-cream/40 p-6 text-center text-sm text-brand-brown">
-            لا توجد منتجات مميزة حالياً.
+            {tx('لا توجد منتجات مميزة حالياً.')}
           </div>
         ) : (
           <div className="max-w-full overflow-x-auto pb-2">
@@ -750,7 +752,7 @@ export default function MenuManagerPage() {
                   <div className="space-y-3 p-3">
                     <div className="min-h-[4rem]">
                       <h3 className="line-clamp-2 break-words text-sm font-bold leading-5 text-brand-text">{item.name}</h3>
-                      <p className="mt-1 text-sm font-black text-brand-burgundy">{formatPrice(item, currency)}</p>
+                      <p className="mt-1 text-sm font-black text-brand-burgundy">{formatPrice(item, currency, tx('حسب الخيار'))}</p>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                       <button type="button" onClick={() => moveFeaturedStep(item.id, -1)} disabled={index === 0} className="flex min-h-10 items-center justify-center rounded-lg border border-brand-border bg-white text-brand-brown disabled:opacity-35">
@@ -774,7 +776,7 @@ export default function MenuManagerPage() {
                       className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-brand-border bg-white text-sm font-bold text-brand-burgundy"
                     >
                       <Edit2 className="h-4 w-4" />
-                      تعديل
+                      {tx('تعديل')}
                     </button>
                     <button
                       type="button"
@@ -783,7 +785,7 @@ export default function MenuManagerPage() {
                       className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 text-sm font-bold text-amber-800 disabled:opacity-60"
                     >
                       {workingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <StarOff className="h-4 w-4" />}
-                      إزالة من المميزة
+                      {tx('إزالة من المميزة')}
                     </button>
                   </div>
                 </article>
@@ -797,8 +799,8 @@ export default function MenuManagerPage() {
         <section className="space-y-4">
           <div className="flex flex-col gap-3 rounded-xl border border-brand-border bg-white p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between sm:p-5">
             <div className="min-w-0 space-y-1">
-              <h2 className="text-xl font-bold text-brand-text">الأقسام</h2>
-              <p className="text-sm leading-6 text-brand-brown">اضغط على القسم لإدارة منتجاته، أو اسحب المقبض لتغيير ترتيبه.</p>
+              <h2 className="text-xl font-bold text-brand-text">{tx('الأقسام')}</h2>
+              <p className="text-sm leading-6 text-brand-brown">{tx('اضغط على القسم لإدارة منتجاته، أو اسحب المقبض لتغيير ترتيبه.')}</p>
             </div>
             <button
               type="button"
@@ -807,13 +809,13 @@ export default function MenuManagerPage() {
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-burgundy px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               {savingCategories ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              حفظ ترتيب الأقسام
+              {tx('حفظ ترتيب الأقسام')}
             </button>
           </div>
 
           {categories.length === 0 ? (
             <div className="rounded-xl border border-dashed border-brand-border bg-white p-8 text-center text-sm text-brand-brown">
-              لا توجد أقسام حتى الآن.
+              {tx('لا يوجد أقسام حتى الآن.')}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -835,13 +837,13 @@ export default function MenuManagerPage() {
                         {categoryImage ? <SafeAdminImage src={categoryImage} alt={category.name} /> : <EmptyImage label={category.name} />}
                         {category.is_active === false && (
                           <span className="absolute right-3 top-3 rounded-full bg-gray-900/75 px-2.5 py-1 text-xs font-bold text-white">
-                            غير نشط
+                            {tx('غير نشط')}
                           </span>
                         )}
                       </div>
                       <div className="space-y-2 p-4">
                         <h3 className="line-clamp-2 break-words text-lg font-bold leading-7 text-brand-burgundy">{category.name}</h3>
-                        <p className="text-sm font-bold text-brand-brown">{productCount} منتج</p>
+                        <p className="text-sm font-bold text-brand-brown">{tx('{count} منتج', { count: productCount })}</p>
                       </div>
                     </button>
 
@@ -875,7 +877,7 @@ export default function MenuManagerPage() {
                         className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-brand-border bg-brand-cream px-3 py-2 text-sm font-bold text-brand-burgundy transition-colors hover:bg-brand-beige disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {uploadingImageKey === imageKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                        {uploadingImageKey === imageKey ? 'جاري رفع الصورة...' : 'الصورة'}
+                        {uploadingImageKey === imageKey ? tx('جاري رفع الصورة...') : tx('الصورة')}
                       </button>
                     </div>
                   </article>
@@ -894,12 +896,12 @@ export default function MenuManagerPage() {
                 className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-brand-border bg-brand-cream px-4 py-2 text-sm font-bold text-brand-burgundy transition-colors hover:bg-brand-beige sm:w-fit"
               >
                 <ChevronRight className="h-4 w-4" />
-                رجوع للأقسام
+                {tx('رجوع للأقسام')}
               </button>
               <div>
                 <h2 className="break-words text-xl font-bold text-brand-text">{selectedCategory.name}</h2>
                 <p className="text-sm leading-6 text-brand-brown">
-                  {selectedCategoryItems.length} منتج. اسحب المقبض لتغيير ترتيب المنتجات داخل هذا القسم فقط.
+                  {tx('{count} منتج. اسحب المقبض لتغيير ترتيب المنتجات داخل هذا القسم فقط.', { count: selectedCategoryItems.length })}
                 </p>
               </div>
             </div>
@@ -910,13 +912,13 @@ export default function MenuManagerPage() {
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-burgundy px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-burgundy-dark disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               {savingProducts ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              حفظ ترتيب المنتجات
+              {tx('حفظ ترتيب المنتجات')}
             </button>
           </div>
 
           {selectedCategoryItems.length === 0 ? (
             <div className="rounded-xl border border-dashed border-brand-border bg-white p-8 text-center text-sm text-brand-brown">
-              لا توجد منتجات في هذا القسم.
+              {tx('لا توجد منتجات في هذا القسم.')}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -936,12 +938,12 @@ export default function MenuManagerPage() {
                       {itemImage ? <SafeAdminImage src={itemImage} alt={item.name} /> : <EmptyImage />}
                       <span className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'
                         }`}>
-                        {item.is_available ? 'متاح' : 'غير متاح'}
+                        {item.is_available ? tx('متاح') : tx('غير متاح')}
                       </span>
                     </div>
                     <div className="space-y-2 p-4">
                       <h3 className="line-clamp-2 min-h-[3.5rem] break-words text-base font-bold leading-7 text-brand-text">{item.name}</h3>
-                      <p className="text-sm font-black text-brand-gold">{formatPrice(item, currency)}</p>
+                      <p className="text-sm font-black text-brand-gold">{formatPrice(item, currency, tx('حسب الخيار'))}</p>
                     </div>
                     <div className="space-y-2 border-t border-brand-border bg-white p-3">
                       <div className="grid grid-cols-5 gap-2">
@@ -973,7 +975,7 @@ export default function MenuManagerPage() {
                         className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-brand-border bg-brand-cream px-3 py-2 text-sm font-bold text-brand-burgundy transition-colors hover:bg-brand-beige disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {uploadingImageKey === imageKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                        {uploadingImageKey === imageKey ? 'جاري رفع الصورة...' : 'الصورة'}
+                        {uploadingImageKey === imageKey ? tx('جاري رفع الصورة...') : tx('الصورة')}
                       </button>
                     </div>
                   </article>

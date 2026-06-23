@@ -3,12 +3,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import type { Database } from '@/types/supabase'
 import type { PublicMenuPayload } from '@/lib/public-menu-data'
-import { ChevronRight, Info, Image as ImageIcon, MapPin } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Info, Image as ImageIcon, MapPin } from 'lucide-react'
 import Image from 'next/image'
 import PublicFooter from '@/components/public/PublicFooter'
+import LanguageToggle from '@/components/i18n/LanguageToggle'
+import { useLocale } from '@/i18n/LocaleProvider'
+import type { CatalogLocale } from '@/lib/catalog-locale'
 
 const MENU_IMAGES_PUBLIC_PREFIX = '/storage/v1/object/public/menu-images/'
-const PUBLIC_MENU_SESSION_CACHE_KEY = 'asalet-public-menu-v1'
+const PUBLIC_MENU_SESSION_CACHE_KEY_PREFIX = 'asalet-public-menu-v3'
 const PUBLIC_MENU_SESSION_CACHE_TTL = 5 * 60 * 1000
 
 const isOptimizedMenuImage = (url: string) => {
@@ -146,7 +149,8 @@ function isPublicMenuPayload(value: unknown): value is PublicMenuPayload {
   if (!value || typeof value !== 'object') return false
 
   const payload = value as Partial<PublicMenuPayload>
-  return Array.isArray(payload.categories)
+  return (payload.locale === 'ar' || payload.locale === 'en' || payload.locale === 'tr')
+    && Array.isArray(payload.categories)
     && Array.isArray(payload.items)
     && Array.isArray(payload.groups)
     && Array.isArray(payload.options)
@@ -156,13 +160,17 @@ function isPublicMenuPayload(value: unknown): value is PublicMenuPayload {
     && Array.isArray(payload.tables)
 }
 
-function readPublicMenuCache(): PublicMenuCacheEntry | null {
+function getPublicMenuSessionCacheKey(locale: CatalogLocale) {
+  return `${PUBLIC_MENU_SESSION_CACHE_KEY_PREFIX}:${locale}`
+}
+
+function readPublicMenuCache(locale: CatalogLocale): PublicMenuCacheEntry | null {
   try {
-    const cachedValue = window.sessionStorage.getItem(PUBLIC_MENU_SESSION_CACHE_KEY)
+    const cachedValue = window.sessionStorage.getItem(getPublicMenuSessionCacheKey(locale))
     if (!cachedValue) return null
 
     const parsedValue = JSON.parse(cachedValue) as Partial<PublicMenuCacheEntry>
-    if (typeof parsedValue.cachedAt !== 'number' || !isPublicMenuPayload(parsedValue.data)) {
+    if (typeof parsedValue.cachedAt !== 'number' || !isPublicMenuPayload(parsedValue.data) || parsedValue.data.locale !== locale) {
       return null
     }
 
@@ -177,7 +185,7 @@ function readPublicMenuCache(): PublicMenuCacheEntry | null {
 
 function writePublicMenuCache(data: PublicMenuPayload) {
   try {
-    window.sessionStorage.setItem(PUBLIC_MENU_SESSION_CACHE_KEY, JSON.stringify({
+    window.sessionStorage.setItem(getPublicMenuSessionCacheKey(data.locale), JSON.stringify({
       cachedAt: Date.now(),
       data,
     }))
@@ -215,6 +223,7 @@ const buildMenuUrl = (href: string, state: MenuUrlState) => {
 }
 
 export default function MenuClient() {
+  const { direction, locale, t } = useLocale()
   const [menuData, setMenuData] = useState<PublicMenuPayload | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -262,17 +271,25 @@ export default function MenuClient() {
     let cancelled = false
 
     const loadMenu = async () => {
-      const cachedMenu = readPublicMenuCache()
+      const cachedMenu = readPublicMenuCache(locale)
       const cacheIsFresh = cachedMenu && Date.now() - cachedMenu.cachedAt < PUBLIC_MENU_SESSION_CACHE_TTL
+
+      setLoadError(false)
+      setIsUsingStaleCache(false)
+      setIsLoading(true)
 
       if (cacheIsFresh) {
         setMenuData(cachedMenu.data)
+        const translatedItems = buildMenuItems(cachedMenu.data)
+        setCart((currentCart) => currentCart.map((cartItem) => ({
+          ...cartItem,
+          item: translatedItems.find((item) => item.id === cartItem.item.id) || cartItem.item,
+        })))
         setIsLoading(false)
-        return
       }
 
       try {
-        const response = await fetch('/api/public-menu')
+        const response = await fetch(`/api/public-menu?locale=${locale}`, { cache: 'no-store' })
         if (!response.ok) {
           throw new Error(`Public menu request failed with status ${response.status}`)
         }
@@ -286,6 +303,11 @@ export default function MenuClient() {
 
         writePublicMenuCache(data)
         setMenuData(data)
+        const translatedItems = buildMenuItems(data)
+        setCart((currentCart) => currentCart.map((cartItem) => ({
+          ...cartItem,
+          item: translatedItems.find((item) => item.id === cartItem.item.id) || cartItem.item,
+        })))
       } catch (error) {
         console.error('Public menu load failed:', error)
         if (cancelled) return
@@ -308,7 +330,7 @@ export default function MenuClient() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [locale])
 
   useEffect(() => {
     const synchronizeTableFromUrl = () => {
@@ -512,7 +534,7 @@ export default function MenuClient() {
       quantity: productQuantity,
       total
     }])
-    setCartFeedback('تمت الإضافة للسلة')
+    setCartFeedback(t('addedToCart'))
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current)
     feedbackTimeoutRef.current = setTimeout(() => setCartFeedback(''), 2200)
 
@@ -546,16 +568,16 @@ export default function MenuClient() {
         (selectedItem.base_price === null || selectedItem.base_price === 0 || group.is_required) &&
         selected.length === 0
       ) {
-        return `يرجى اختيار النوع من ${group.title}`;
+        return t('selectVariantFrom', { group: group.title });
       }
       if (group.is_required && group.selection_type === 'single' && selected.length === 0) {
-        return `يرجى اختيار خيار واحد على الأقل من ${group.title}`;
+        return t('selectAtLeastOneFrom', { group: group.title });
       }
       if (group.is_required && group.selection_type === 'multiple' && group.min_select !== null && selected.length < group.min_select) {
-        return `يرجى اختيار ${group.min_select} خيارات على الأقل من ${group.title}`;
+        return t('selectAtLeastFrom', { count: group.min_select, group: group.title });
       }
       if (group.selection_type === 'multiple' && group.max_select !== null && selected.length > group.max_select) {
-        return `لا يمكنك اختيار أكثر من ${group.max_select} خيارات من ${group.title}`;
+        return t('selectNoMoreThanFrom', { count: group.max_select, group: group.title });
       }
     }
     return null;
@@ -566,15 +588,15 @@ export default function MenuClient() {
   const cartTotal = cart.reduce((sum, current) => sum + current.total * current.quantity, 0)
 
   const generateWhatsAppMessage = () => {
-    let msg = `*طلب جديد من منيو أصالة:* 🛒\n`
+    let msg = `*${t('whatsappOrderTitle')}* 🛒\n`
     if (table) {
-      msg += `رقم الطاولة: ${table.label}\n`
+      msg += `${t('whatsappTable')}: ${table.label}\n`
     }
     msg += '\n'
 
     cart.forEach((cartItem, index) => {
       msg += `${index + 1}) *${cartItem.item.name}*\n`
-      msg += `الكمية: ${cartItem.quantity}\n`
+      msg += `${t('whatsappQuantity')}: ${cartItem.quantity}\n`
 
       // Add selections
       cartItem.item.groups.forEach(group => {
@@ -591,10 +613,10 @@ export default function MenuClient() {
           })
         }
       })
-      msg += `السعر الفرعي: ${cartItem.total} ${currency}\n\n`
+      msg += `${t('whatsappSubtotal')}: ${cartItem.total} ${currency}\n\n`
     })
 
-    msg += `*الإجمالي: ${cartTotal} ${currency}*`
+    msg += `*${t('total')}: ${cartTotal} ${currency}*`
     return encodeURIComponent(msg)
   }
 
@@ -604,6 +626,7 @@ export default function MenuClient() {
 
         {/* Compact Restaurant Header */}
         <div className="bg-[#fbf9f7] pt-6 pb-4 px-5 flex flex-col items-center text-center border-b border-brand-border/50">
+          <LanguageToggle className="absolute end-4 top-4" />
           <div className="w-32 h-32 sm:w-40 sm:h-40 relative flex items-center justify-center">
             <Image
               src="/logo.png"
@@ -622,7 +645,7 @@ export default function MenuClient() {
           )}
           {isUsingStaleCache && (
             <p className="mt-2 rounded-full border border-brand-gold/40 bg-brand-cream px-3 py-1 text-xs font-bold text-brand-brown">
-              قد تكون بيانات المنيو غير محدثة حالياً
+              {t('menuMayBeOutdated')}
             </p>
           )}
         </div>
@@ -630,7 +653,7 @@ export default function MenuClient() {
         {/* Featured Products */}
         {activeCategoryView === null && sortedItems.filter(i => i.is_featured).length > 0 && (
           <div className="pt-8 pb-2 overflow-hidden">
-            <h2 className="text-[20px] font-black text-brand-text mb-4 px-5">المنتجات المميزة</h2>
+            <h2 className="text-[20px] font-black text-brand-text mb-4 px-5">{t('featuredProducts')}</h2>
             {(() => {
               const baseFeatured = sortedItems.filter(i => i.is_featured)
               // Ensure we have enough items to fill the screen twice (for seamless 50% translation)
@@ -641,7 +664,7 @@ export default function MenuClient() {
 
               return (
                 <div className="overflow-x-auto hide-scrollbar pb-4 px-5">
-                  <div className="flex gap-4 pl-4 w-max animate-marquee">
+                  <div className={`flex w-max gap-4 pl-4 ${direction === 'rtl' ? 'animate-marquee-rtl' : 'animate-marquee-ltr'}`} dir={direction}>
                     {marqueeItems.map((item, index) => (
                       <div
                         key={`${item.id}-${index}`}
@@ -661,7 +684,7 @@ export default function MenuClient() {
                           <h3 className="font-bold text-[14px] text-brand-text line-clamp-2 leading-tight mb-2">{item.name}</h3>
                           <div className="mt-auto">
                             <span className="text-brand-burgundy font-bold text-[14px]">
-                              {item.base_price !== null ? `${item.base_price} ${currency}` : 'اختر النوع'}
+                              {item.base_price !== null ? `${item.base_price} ${currency}` : t('chooseVariant')}
                             </span>
                           </div>
                         </div>
@@ -678,22 +701,22 @@ export default function MenuClient() {
         {activeCategoryView === null && (
           <div className="px-5 py-6">
             <div className="flex items-center mb-6">
-              <h2 className="text-[22px] font-black text-brand-text">قائمة الطعام</h2>
+              <h2 className="text-[22px] font-black text-brand-text">{t('foodMenu')}</h2>
             </div>
             {isLoading ? (
               <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
                 <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
-                <p className="text-brand-brown font-medium">جاري تحميل المنيو...</p>
+                <p className="text-brand-brown font-medium">{t('loadingMenu')}</p>
               </div>
             ) : loadError ? (
               <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
                 <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
-                <p className="text-brand-brown font-medium">تعذر تحميل المنيو حالياً، يرجى المحاولة بعد قليل</p>
+                <p className="text-brand-brown font-medium">{t('menuLoadFailed')}</p>
               </div>
             ) : categories.length === 0 ? (
               <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
                 <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
-                <p className="text-brand-brown font-medium">لا يوجد أقسام متاحة حالياً</p>
+                <p className="text-brand-brown font-medium">{t('noCategoriesAvailable')}</p>
               </div>
             ) : (
               <div className="mx-auto grid max-w-5xl grid-cols-2 justify-center gap-3 sm:grid-cols-[repeat(3,minmax(0,180px))] lg:grid-cols-[repeat(5,minmax(0,180px))]">
@@ -739,9 +762,9 @@ export default function MenuClient() {
                 <button
                   onClick={closeCategoryView}
                   className="w-10 h-10 shrink-0 bg-[#fbf9f7] shadow-sm border border-brand-border rounded-full flex items-center justify-center hover:bg-brand-beige active:scale-90 transition-all text-brand-burgundy"
-                  aria-label="العودة للأقسام"
+                  aria-label={t('backToCategories')}
                 >
-                  <ChevronRight className="w-6 h-6" />
+                  {direction === 'rtl' ? <ChevronRight className="w-6 h-6" /> : <ChevronLeft className="w-6 h-6" />}
                 </button>
 
                 <div className="flex-1 overflow-x-auto hide-scrollbar flex gap-2.5 snap-x py-2 pr-1">
@@ -766,7 +789,7 @@ export default function MenuClient() {
               {sortedItems.filter(i => i.category_id === activeCategoryView).length === 0 ? (
                 <div className="text-center py-12 bg-[#fbf9f7] rounded-2xl border border-brand-border shadow-sm">
                   <Info className="w-10 h-10 mx-auto mb-2 text-brand-beige" />
-                  <p className="text-brand-brown font-medium">لا يوجد منتجات في هذا القسم</p>
+                  <p className="text-brand-brown font-medium">{t('noProductsInCategory')}</p>
                 </div>
               ) : (
                 <div className="mx-auto grid max-w-5xl grid-cols-2 justify-center gap-3 sm:grid-cols-[repeat(3,minmax(0,180px))] lg:grid-cols-[repeat(5,minmax(0,180px))]">
@@ -797,7 +820,7 @@ export default function MenuClient() {
 
                         <div className="mt-auto pt-2 flex items-center justify-between">
                           <span className="text-brand-gold font-black text-[14px]">
-                            {item.base_price !== null ? `${item.base_price} ${currency}` : 'اختر النوع'}
+                            {item.base_price !== null ? `${item.base_price} ${currency}` : t('chooseVariant')}
                           </span>
                           <div className="w-8 h-8 rounded-full bg-brand-cream text-brand-burgundy flex items-center justify-center transition-colors group-hover:bg-brand-burgundy group-hover:text-white">
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -832,7 +855,7 @@ export default function MenuClient() {
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
                       <path d="M2.25 2.25a.75.75 0 000 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 00-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 000-1.5H5.378A2.25 2.25 0 017.5 15h11.218a.75.75 0 00.674-.421 60.358 60.358 0 002.96-7.228.75.75 0 00-.525-.965A60.864 60.864 0 005.68 4.509l-.232-.867A1.875 1.875 0 003.636 2.25H2.25zM3.75 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM16.5 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z" />
                     </svg>
-                    <span>السلة</span>
+                    <span>{t('cart')}</span>
                   </div>
                   <div className="bg-[#fbf9f7]/20 px-3 py-1 rounded-full text-sm font-black">
                     {cartTotal} {currency}
@@ -842,7 +865,7 @@ export default function MenuClient() {
                 <button
                   onClick={openCartSheet}
                   className="absolute bottom-[90px] right-4 sm:right-6 pointer-events-auto bg-brand-cream border-2 border-brand-burgundy text-brand-burgundy w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:bg-brand-beige active:scale-90 transition-all animate-in fade-in zoom-in"
-                  aria-label="فتح السلة"
+                  aria-label={t('openCart')}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                     <circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
@@ -871,7 +894,7 @@ export default function MenuClient() {
                   <button
                     onClick={closeProductSheet}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-brand-border bg-white text-brand-text shadow-sm transition-colors hover:bg-brand-cream"
-                    aria-label="إغلاق"
+                    aria-label={t('close')}
                   >
                     <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -890,13 +913,13 @@ export default function MenuClient() {
                     )}
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col justify-center">
-                    <span className="text-xs font-bold text-brand-brown">السعر الحالي</span>
+                    <span className="text-xs font-bold text-brand-brown">{t('currentPrice')}</span>
                     <span className="mt-1 break-words text-xl font-black text-brand-burgundy">
-                      {total !== null ? `${total} ${currency}` : 'اختر النوع'}
+                      {total !== null ? `${total} ${currency}` : t('chooseVariant')}
                     </span>
                     {selectedItem.groups.some(group => group.kind === 'variant') && (
                       <p className="mt-2 text-xs leading-5 text-brand-brown">
-                        اختر النوع أولاً، ثم أضف الإضافات التي تريدها.
+                        {t('chooseVariantFirst')}
                       </p>
                     )}
                   </div>
@@ -907,7 +930,7 @@ export default function MenuClient() {
               <div className="relative z-0 flex-1 space-y-4 overflow-y-auto p-4 pb-5">
                 {selectedItem.groups.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-brand-border bg-white p-5 text-center text-sm font-medium text-brand-brown">
-                    لا توجد خيارات إضافية لهذا المنتج.
+                    {t('noAdditionalOptions')}
                   </div>
                 ) : selectedItem.groups.map(group => (
                   <div key={group.id} className="rounded-2xl border border-brand-border bg-white p-4 shadow-sm">
@@ -915,12 +938,12 @@ export default function MenuClient() {
                       <div className="min-w-0">
                         <h3 className="break-words font-bold leading-6 text-brand-text">{group.title}</h3>
                         <p className="mt-0.5 text-xs text-brand-brown">
-                          {group.selection_type === 'multiple' ? 'يمكن اختيار أكثر من خيار' : 'اختر خياراً واحداً'}
+                          {group.selection_type === 'multiple' ? t('multipleChoicesAllowed') : t('chooseOneOption')}
                         </p>
                       </div>
                       {group.is_required && (
                         <span className="shrink-0 rounded-full bg-brand-burgundy/10 px-2.5 py-1 text-[10px] font-bold text-brand-burgundy">
-                          إجباري
+                          {t('required')}
                         </span>
                       )}
                     </div>
@@ -994,7 +1017,7 @@ export default function MenuClient() {
                     </button>
                   </div>
                   <span className="min-w-0 text-left text-2xl font-black text-brand-text">
-                    {total !== null ? `${total * productQuantity} ${currency}` : <span className="text-[15px] font-normal text-brand-brown/60">اختر النوع</span>}
+                    {total !== null ? `${total * productQuantity} ${currency}` : <span className="text-[15px] font-normal text-brand-brown/60">{t('chooseVariant')}</span>}
                   </span>
                 </div>
                 <button
@@ -1002,7 +1025,7 @@ export default function MenuClient() {
                   disabled={total === null || validationError !== null}
                   className="w-full rounded-2xl bg-brand-burgundy py-4 text-[17px] font-bold text-white transition-all hover:bg-[#681010] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  إضافة للسلة
+                  {t('addToCart')}
                 </button>
               </div>
             </div>
@@ -1018,11 +1041,11 @@ export default function MenuClient() {
 
               {/* Header */}
               <div className="p-5 bg-[#fbf9f7] border-b border-brand-border/50 shrink-0 flex justify-between items-center z-10 rounded-t-2xl">
-                <h2 className="text-xl font-black text-brand-text">سلة الطلبات</h2>
+                <h2 className="text-xl font-black text-brand-text">{t('cartItems')}</h2>
                 <button
                   onClick={closeCartSheet}
                   className="bg-brand-cream text-brand-burgundy border border-brand-border/50 w-9 h-9 rounded-full flex items-center justify-center hover:bg-brand-beige transition-colors"
-                  aria-label="إغلاق السلة"
+                  aria-label={t('closeCart')}
                 >
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1037,7 +1060,7 @@ export default function MenuClient() {
                     <div className="w-20 h-20 bg-brand-cream rounded-full flex items-center justify-center mx-auto mb-4 border border-brand-border/50">
                       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-beige"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                     </div>
-                    <p className="text-brand-brown font-medium">السلة فارغة</p>
+                    <p className="text-brand-brown font-medium">{t('emptyCart')}</p>
                   </div>
                 ) : (
                   cart.map((cartItem) => (
@@ -1069,7 +1092,7 @@ export default function MenuClient() {
 
                             return (
                               <p key={group.id} className="text-[12px] text-brand-brown">
-                                <span className="font-medium text-brand-text">{group.title}:</span> {selectedOptions.map(o => (o.price || 0) > 0 ? `${o.name} (+${o.price} ${currency})` : o.name).join('، ')}
+                                <span className="font-medium text-brand-text">{group.title}:</span> {selectedOptions.map(o => (o.price || 0) > 0 ? `${o.name} (+${o.price} ${currency})` : o.name).join(locale === 'ar' ? '، ' : ', ')}
                               </p>
                             )
                           })}
@@ -1092,10 +1115,10 @@ export default function MenuClient() {
               <div className="p-5 bg-[#fbf9f7] border-t border-brand-border/50 shrink-0 sm:rounded-b-2xl">
                 <div className="flex justify-between items-end mb-4 px-1">
                   <div className="flex flex-col">
-                    <span className="text-brand-brown font-medium text-sm mb-1">الإجمالي</span>
+                    <span className="text-brand-brown font-medium text-sm mb-1">{t('total')}</span>
                     {cart.length > 0 && (
                       <button onClick={clearCart} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1 active:scale-95 transition-transform">
-                        تفريغ السلة
+                        {t('clearCart')}
                       </button>
                     )}
                   </div>
@@ -1123,7 +1146,7 @@ export default function MenuClient() {
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.888-.788-1.489-1.761-1.663-2.06-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
                   </svg>
-                  <span>إرسال الطلب عبر الواتساب</span>
+                  <span>{t('sendWhatsAppOrder')}</span>
                 </a>
               </div>
             </div>
@@ -1148,16 +1171,27 @@ export default function MenuClient() {
           0% { transform: translateX(0); }
           100% { transform: translateX(50%); }
         }
-        .animate-marquee {
+        @keyframes marquee-ltr {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee-rtl {
           animation: marquee-rtl 40s linear infinite;
           will-change: transform;
         }
-        .animate-marquee:hover,
-        .animate-marquee:active {
+        .animate-marquee-ltr {
+          animation: marquee-ltr 40s linear infinite;
+          will-change: transform;
+        }
+        .animate-marquee-rtl:hover,
+        .animate-marquee-rtl:active,
+        .animate-marquee-ltr:hover,
+        .animate-marquee-ltr:active {
           animation-play-state: paused;
         }
         @media (prefers-reduced-motion: reduce) {
-          .animate-marquee {
+          .animate-marquee-rtl,
+          .animate-marquee-ltr {
             animation: none !important;
           }
         }
