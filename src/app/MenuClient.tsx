@@ -626,7 +626,7 @@ export default function MenuClient() {
 
         {/* Compact Restaurant Header */}
         <div className="bg-[#fbf9f7] pt-6 pb-4 px-5 flex flex-col items-center text-center border-b border-brand-border/50">
-          <LanguageToggle className="absolute end-4 top-4" />
+          <LanguageToggle className="absolute right-4 top-4 z-10" />
           <div className="w-32 h-32 sm:w-40 sm:h-40 relative flex items-center justify-center">
             <Image
               src="/logo.png"
