@@ -3,7 +3,15 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/supabase'
 import type { CatalogLocale } from '@/lib/catalog-locale'
 
-export const PUBLIC_MENU_CACHE_CONTROL = 'public, s-maxage=300, stale-while-revalidate=86400'
+// The menu must reflect dashboard edits immediately. A CDN-cached response
+// (s-maxage) cannot be purged by `revalidateTag`, so it would keep serving stale
+// data for the whole max-age window. We instead rely on the tagged data cache
+// below (invalidated on every admin write) and keep the HTTP response uncached.
+export const PUBLIC_MENU_CACHE_CONTROL = 'no-store'
+
+// Tag used by the data cache below and by /api/revalidate-menu to invalidate it
+// whenever the dashboard mutates the catalog.
+export const PUBLIC_MENU_CACHE_TAG = 'public-menu'
 
 export type PublicMenuPayload = {
   locale: CatalogLocale
@@ -177,7 +185,10 @@ async function fetchPublicMenuData(locale: CatalogLocale) {
 }
 
 const getCachedPublicMenuData = unstable_cache(fetchPublicMenuData, ['public-menu-data-v4'], {
-  revalidate: 300,
+  // Tagged so admin writes can invalidate it instantly. `revalidate` is only a
+  // safety net in case an invalidation request is ever missed.
+  revalidate: 60,
+  tags: [PUBLIC_MENU_CACHE_TAG],
 })
 
 export function getPublicMenuData(locale: CatalogLocale) {
