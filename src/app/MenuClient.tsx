@@ -881,19 +881,19 @@ export default function MenuClient() {
           <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
             <div className="absolute inset-0" onClick={closeProductSheet} />
 
-            <div className="relative flex max-h-[92dvh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-3xl bg-[#fbf9f7] shadow-2xl sm:max-h-[90dvh] sm:rounded-2xl">
-              <div className="shrink-0 border-b border-brand-border/50 bg-[#fbf9f7] px-4 pb-4 pt-3 sm:px-5">
-                <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-brand-border sm:hidden" />
+            <div className="relative flex h-[92dvh] max-h-[92dvh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-3xl bg-[#fbf9f7] shadow-2xl sm:h-auto sm:max-h-[90dvh] sm:rounded-2xl">
+              <div className="shrink-0 border-b border-brand-border/50 bg-[#fbf9f7] px-4 pb-3 pt-2.5 sm:px-5 sm:pb-4 sm:pt-3">
+                <div className="mx-auto mb-2.5 h-1.5 w-12 rounded-full bg-brand-border sm:hidden" />
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="break-words text-xl font-black leading-7 text-brand-text sm:text-2xl">{selectedItem.name}</h2>
+                    <h2 className="break-words text-lg font-black leading-6 text-brand-text sm:text-2xl sm:leading-7">{selectedItem.name}</h2>
                     {selectedItem.description && (
-                      <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-brand-brown sm:text-sm">{selectedItem.description}</p>
+                      <p className="mt-1 line-clamp-1 text-[13px] leading-5 text-brand-brown sm:line-clamp-2 sm:text-sm">{selectedItem.description}</p>
                     )}
                   </div>
                   <button
                     onClick={closeProductSheet}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-brand-border bg-white text-brand-text shadow-sm transition-colors hover:bg-brand-cream"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-border bg-white text-brand-text shadow-sm transition-colors hover:bg-brand-cream sm:h-10 sm:w-10"
                     aria-label={t('close')}
                   >
                     <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -902,23 +902,23 @@ export default function MenuClient() {
                   </button>
                 </div>
 
-                <div className="mt-4 flex gap-3 rounded-2xl border border-brand-border bg-white p-3">
-                  <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-brand-border bg-brand-cream sm:h-36 sm:w-36">
+                <div className="mt-3 flex gap-3 rounded-2xl border border-brand-border bg-white p-2.5 sm:mt-4 sm:p-3">
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-brand-border bg-brand-cream sm:h-32 sm:w-32">
                     {getValidImageUrl(selectedItem.image_url) ? (
                       <SafeImage src={getValidImageUrl(selectedItem.image_url)!} alt={selectedItem.name} className="object-contain" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <ImageIcon className="h-10 w-10 text-brand-beige" />
+                        <ImageIcon className="h-8 w-8 text-brand-beige sm:h-10 sm:w-10" />
                       </div>
                     )}
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col justify-center">
                     <span className="text-xs font-bold text-brand-brown">{t('currentPrice')}</span>
-                    <span className="mt-1 break-words text-xl font-black text-brand-burgundy">
+                    <span className="mt-0.5 break-words text-lg font-black text-brand-burgundy sm:mt-1 sm:text-xl">
                       {total !== null ? `${total} ${currency}` : t('chooseVariant')}
                     </span>
                     {selectedItem.groups.some(group => group.kind === 'variant') && (
-                      <p className="mt-2 text-xs leading-5 text-brand-brown">
+                      <p className="mt-1.5 text-xs leading-5 text-brand-brown sm:mt-2">
                         {t('chooseVariantFirst')}
                       </p>
                     )}
@@ -960,7 +960,7 @@ export default function MenuClient() {
                             role={isSingle ? "radio" : undefined}
                             aria-checked={isSingle ? isSelected : undefined}
                             aria-pressed={!isSingle ? isSelected : undefined}
-                            className={`flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-2 p-3 text-right transition-all active:scale-[0.99] sm:p-4 ${isSelected
+                            className={`flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-2 p-3 text-start transition-all active:scale-[0.99] sm:p-4 ${isSelected
                                 ? 'border-brand-burgundy bg-brand-burgundy/10'
                                 : 'border-brand-border bg-[#fbf9f7] hover:border-brand-gold/40'
                               }`}
@@ -991,13 +991,13 @@ export default function MenuClient() {
               </div>
 
               {/* Bottom Action Bar */}
-              <div className="z-20 shrink-0 border-t border-brand-border/50 bg-[#fbf9f7] p-4 pb-6 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.08)] sm:p-5">
+              <div className="z-20 shrink-0 border-t border-brand-border/50 bg-[#fbf9f7] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.08)] sm:p-5 sm:pb-6">
                 {validationError && (
-                  <div className="mb-3 rounded-xl bg-brand-burgundy/10 px-3 py-2 text-center text-sm font-bold text-brand-burgundy">
+                  <div className="mb-2.5 rounded-xl bg-brand-burgundy/10 px-3 py-2 text-center text-sm font-bold text-brand-burgundy sm:mb-3">
                     {validationError}
                   </div>
                 )}
-                <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
                   <div className="flex items-center gap-2 rounded-xl border border-brand-border bg-white px-2 py-1.5">
                     <button
                       type="button"
@@ -1023,7 +1023,7 @@ export default function MenuClient() {
                 <button
                   onClick={addToCart}
                   disabled={total === null || validationError !== null}
-                  className="w-full rounded-2xl bg-brand-burgundy py-4 text-[17px] font-bold text-white transition-all hover:bg-[#681010] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-2xl bg-brand-burgundy py-3.5 text-[17px] font-bold text-white transition-all hover:bg-[#681010] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:py-4"
                 >
                   {t('addToCart')}
                 </button>
