@@ -54,12 +54,23 @@ type Option = Pick<Database['public']['Tables']['item_options']['Row'], 'id' | '
 type OptionGroup = Pick<Database['public']['Tables']['item_option_groups']['Row'], 'id' | 'title' | 'kind' | 'selection_type' | 'is_required' | 'min_select' | 'max_select' | 'sort_order'> & { options: Option[], source?: 'item' | 'template' }
 type MenuItem = Pick<Database['public']['Tables']['menu_items']['Row'], 'id' | 'category_id' | 'name' | 'description' | 'base_price' | 'image_url' | 'is_featured' | 'sort_order' | 'created_at'> & { groups: OptionGroup[] }
 type RestaurantTable = Pick<Database['public']['Tables']['restaurant_tables']['Row'], 'id' | 'label' | 'code'>
+type OptionQuantities = Record<string, number>
+
+type ItemPricing = {
+  unitPrice: number
+  baseTotal: number
+  additionsTotal: number
+  total: number
+}
 
 type CartItem = {
   id: string
   item: MenuItem
   selections: Record<string, string[]>
+  optionQuantities: OptionQuantities
   quantity: number
+  unitPrice: number
+  additionsTotal: number
   total: number
 }
 
@@ -209,6 +220,98 @@ const buildInitialSelections = (item: MenuItem) => {
   return initialSelections
 }
 
+const buildInitialOptionQuantities = (item: MenuItem, selections: Record<string, string[]>) => {
+  const initialQuantities: OptionQuantities = {}
+
+  item.groups.forEach(group => {
+    if (group.kind === 'variant') return
+
+    const selectedOptionIds = selections[group.id] || []
+    selectedOptionIds.forEach(optionId => {
+      initialQuantities[optionId] = 1
+    })
+  })
+
+  return initialQuantities
+}
+
+const clampOptionQuantities = (optionQuantities: OptionQuantities, maxQuantity: number) => {
+  const nextQuantities: OptionQuantities = {}
+  const safeMaxQuantity = Math.max(1, maxQuantity)
+
+  Object.entries(optionQuantities).forEach(([optionId, quantity]) => {
+    nextQuantities[optionId] = Math.min(safeMaxQuantity, Math.max(1, quantity))
+  })
+
+  return nextQuantities
+}
+
+const getItemUnitPrice = (item: MenuItem, selections: Record<string, string[]>) => {
+  let unitPrice = item.base_price || 0
+  const hasVariantGroup = item.groups.some(group => group.kind === 'variant')
+  let variantSelected = false
+
+  item.groups.forEach(group => {
+    if (group.kind !== 'variant') return
+
+    const selectedOptionIds = selections[group.id] || []
+    selectedOptionIds.forEach(optionId => {
+      const option = group.options.find(currentOption => currentOption.id === optionId)
+      if (option) {
+        unitPrice = option.price || 0
+        variantSelected = true
+      }
+    })
+  })
+
+  const hasRequiredVariantGroup = item.groups.some(group => (
+    group.kind === 'variant' && (group.is_required || item.base_price === null)
+  ))
+
+  if ((item.base_price === null || (item.base_price === 0 && hasRequiredVariantGroup)) && hasVariantGroup && !variantSelected) {
+    return null
+  }
+
+  return unitPrice
+}
+
+const calculateAdditionsTotal = (
+  item: MenuItem,
+  selections: Record<string, string[]>,
+  optionQuantities: OptionQuantities
+) => item.groups.reduce((sum, group) => {
+  if (group.kind === 'variant') return sum
+
+  const selectedOptionIds = selections[group.id] || []
+  return selectedOptionIds.reduce((groupSum, optionId) => {
+    const option = group.options.find(currentOption => currentOption.id === optionId)
+    if (!option) return groupSum
+
+    const quantity = Math.max(1, optionQuantities[optionId] || 1)
+    return groupSum + (option.price || 0) * quantity
+  }, sum)
+}, 0)
+
+const calculateItemPricing = (
+  item: MenuItem,
+  selections: Record<string, string[]>,
+  optionQuantities: OptionQuantities,
+  quantity: number
+): ItemPricing | null => {
+  const unitPrice = getItemUnitPrice(item, selections)
+  if (unitPrice === null) return null
+
+  const baseTotal = unitPrice * quantity
+  const additionsTotal = calculateAdditionsTotal(item, selections, optionQuantities)
+
+  return {
+    unitPrice,
+    baseTotal,
+    additionsTotal,
+    total: baseTotal + additionsTotal,
+  }
+}
+
 const buildMenuUrl = (href: string, state: MenuUrlState) => {
   const url = new URL(href)
   url.searchParams.delete('category')
@@ -232,6 +335,7 @@ export default function MenuClient() {
   const [activeCategoryView, setActiveCategoryView] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [selections, setSelections] = useState<Record<string, string[]>>({})
+  const [optionQuantities, setOptionQuantities] = useState<OptionQuantities>({})
   const [productQuantity, setProductQuantity] = useState(1)
   const [cartFeedback, setCartFeedback] = useState('')
 
@@ -410,7 +514,9 @@ export default function MenuClient() {
 
       if (validItem) {
         setProductQuantity(1)
-        setSelections(buildInitialSelections(validItem))
+        const initialSelections = buildInitialSelections(validItem)
+        setSelections(initialSelections)
+        setOptionQuantities(buildInitialOptionQuantities(validItem, initialSelections))
         setSelectedItem(validItem)
         setIsCartOpen(false)
         return
@@ -473,66 +579,66 @@ export default function MenuClient() {
   const openItem = (item: MenuItem) => {
     setProductQuantity(1)
     setSelectedItem(item)
-    setSelections(buildInitialSelections(item))
+    const initialSelections = buildInitialSelections(item)
+    setSelections(initialSelections)
+    setOptionQuantities(buildInitialOptionQuantities(item, initialSelections))
     updateMenuUrl('push', { categoryId: activeCategoryView, productId: item.id }, 'product')
   }
 
-  const toggleSelection = (groupId: string, optionId: string, selectionType: string) => {
-    setSelections(prev => {
-      const current = prev[groupId] || []
-      if (selectionType === 'single') {
-        return { ...prev, [groupId]: [optionId] }
-      } else {
-        if (current.includes(optionId)) {
-          return { ...prev, [groupId]: current.filter(id => id !== optionId) }
-        } else {
-          return { ...prev, [groupId]: [...current, optionId] }
-        }
-      }
-    })
-  }
+  const toggleSelection = (group: OptionGroup, optionId: string) => {
+    const selectionType = group.selection_type || 'single'
+    const currentGroupSelection = selections[group.id] || []
+    const nextGroupSelection = selectionType === 'single'
+      ? [optionId]
+      : currentGroupSelection.includes(optionId)
+        ? currentGroupSelection.filter(id => id !== optionId)
+        : [...currentGroupSelection, optionId]
 
-  const calculateTotal = () => {
-    if (!selectedItem) return 0
-    let total = selectedItem.base_price || 0
-    const hasVariantGroup = selectedItem.groups.some(g => g.kind === 'variant')
-    let variantSelected = false
+    setSelections(prev => ({ ...prev, [group.id]: nextGroupSelection }))
 
-    selectedItem.groups.forEach(group => {
-      const selectedOptionIds = selections[group.id] || []
-      selectedOptionIds.forEach(optId => {
-        const option = group.options.find(o => o.id === optId)
-        if (option) {
-          if (group.kind === 'variant') {
-            total = option.price || 0
-            variantSelected = true
-          } else {
-            total += (option.price || 0)
-          }
-        }
+    if (group.kind === 'variant') return
+
+    setOptionQuantities(prev => {
+      const next = { ...prev }
+      currentGroupSelection.forEach(id => {
+        if (!nextGroupSelection.includes(id)) delete next[id]
       })
+      nextGroupSelection.forEach(id => {
+        if (!(id in next)) next[id] = 1
+      })
+      return next
     })
-
-    const hasRequiredVariantGroup = selectedItem.groups.some(g => g.kind === 'variant' && (g.is_required || selectedItem.base_price === null))
-
-    if ((selectedItem.base_price === null || (selectedItem.base_price === 0 && hasRequiredVariantGroup)) && hasVariantGroup && !variantSelected) {
-      return null
-    }
-
-    return total
   }
 
-  const total = calculateTotal()
+  const changeProductQuantity = (delta: number) => {
+    const nextQuantity = Math.max(1, productQuantity + delta)
+    setProductQuantity(nextQuantity)
+    setOptionQuantities(current => clampOptionQuantities(current, nextQuantity))
+  }
+
+  const updateOptionQuantity = (optionId: string, delta: number) => {
+    setOptionQuantities(prev => {
+      const nextQuantity = Math.max(1, (prev[optionId] || 1) + delta)
+      return { ...prev, [optionId]: Math.min(Math.max(1, productQuantity), nextQuantity) }
+    })
+  }
+
+  const pricing = selectedItem
+    ? calculateItemPricing(selectedItem, selections, optionQuantities, productQuantity)
+    : null
 
   const addToCart = () => {
-    if (!selectedItem || total === null || validationError) return
+    if (!selectedItem || !pricing || validationError) return
 
     setCart(prev => [...prev, {
       id: Math.random().toString(36).substring(7),
       item: selectedItem,
       selections,
+      optionQuantities,
       quantity: productQuantity,
-      total
+      unitPrice: pricing.unitPrice,
+      additionsTotal: pricing.additionsTotal,
+      total: pricing.total
     }])
     setCartFeedback(t('addedToCart'))
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current)
@@ -547,11 +653,21 @@ export default function MenuClient() {
 
   const updateQuantity = (cartItemId: string, delta: number) => {
     setCart(prev => prev.map(c => {
-      if (c.id === cartItemId) {
-        const newQuantity = Math.max(1, c.quantity + delta);
-        return { ...c, quantity: newQuantity };
-      }
-      return c;
+      if (c.id !== cartItemId) return c;
+
+      const newQuantity = Math.max(1, c.quantity + delta);
+      const newOptionQuantities = clampOptionQuantities(c.optionQuantities, newQuantity);
+      const newPricing = calculateItemPricing(c.item, c.selections, newOptionQuantities, newQuantity);
+      if (!newPricing) return c;
+
+      return {
+        ...c,
+        quantity: newQuantity,
+        optionQuantities: newOptionQuantities,
+        unitPrice: newPricing.unitPrice,
+        additionsTotal: newPricing.additionsTotal,
+        total: newPricing.total,
+      };
     }));
   }
 
@@ -585,7 +701,7 @@ export default function MenuClient() {
 
   const validationError = validateSelection();
 
-  const cartTotal = cart.reduce((sum, current) => sum + current.total * current.quantity, 0)
+  const cartTotal = cart.reduce((sum, current) => sum + current.total, 0)
 
   const generateWhatsAppMessage = () => {
     let msg = `*${t('whatsappOrderTitle')}* 🛒\n`
@@ -605,10 +721,14 @@ export default function MenuClient() {
         if (selectedOptions.length > 0) {
           msg += `${group.title}:\n`
           selectedOptions.forEach(o => {
-            if ((o.price || 0) > 0) {
-              msg += `- ${o.name} +${o.price} ${currency}\n`
+            const isVariant = group.kind === 'variant'
+            const optionQuantity = isVariant ? 1 : Math.max(1, cartItem.optionQuantities[o.id] || 1)
+            const quantitySuffix = optionQuantity > 1 ? ` ×${optionQuantity}` : ''
+            const optionTotal = (o.price || 0) * optionQuantity
+            if (optionTotal > 0 && !isVariant) {
+              msg += `- ${o.name}${quantitySuffix} +${optionTotal} ${currency}\n`
             } else {
-              msg += `- ${o.name}\n`
+              msg += `- ${o.name}${quantitySuffix}\n`
             }
           })
         }
@@ -915,7 +1035,7 @@ export default function MenuClient() {
                   <div className="flex min-w-0 flex-1 flex-col justify-center">
                     <span className="text-xs font-bold text-brand-brown">{t('currentPrice')}</span>
                     <span className="mt-0.5 break-words text-lg font-black text-brand-burgundy sm:mt-1 sm:text-xl">
-                      {total !== null ? `${total} ${currency}` : t('chooseVariant')}
+                      {pricing !== null ? `${pricing.unitPrice} ${currency}` : t('chooseVariant')}
                     </span>
                     {selectedItem.groups.some(group => group.kind === 'variant') && (
                       <p className="mt-1.5 text-xs leading-5 text-brand-brown sm:mt-2">
@@ -952,37 +1072,87 @@ export default function MenuClient() {
                       {group.options.map(opt => {
                         const isSelected = selections[group.id]?.includes(opt.id)
                         const isSingle = group.selection_type === 'single'
+                        const isVariant = group.kind === 'variant'
+                        const optionQuantity = Math.max(1, optionQuantities[opt.id] || 1)
+                        const optionTotal = (opt.price || 0) * optionQuantity
+                        const showQuantityControls = Boolean(isSelected && !isVariant)
                         return (
-                          <button
+                          <div
                             key={opt.id}
-                            type="button"
-                            onClick={() => toggleSelection(group.id, opt.id, group.selection_type || 'single')}
-                            role={isSingle ? "radio" : undefined}
-                            aria-checked={isSingle ? isSelected : undefined}
-                            aria-pressed={!isSingle ? isSelected : undefined}
-                            className={`flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-2 p-3 text-start transition-all active:scale-[0.99] sm:p-4 ${isSelected
+                            className={`rounded-xl border-2 transition-all ${isSelected
                                 ? 'border-brand-burgundy bg-brand-burgundy/10'
                                 : 'border-brand-border bg-[#fbf9f7] hover:border-brand-gold/40'
                               }`}
                           >
-                            <div className="flex min-w-0 items-center gap-3">
-                              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${isSelected ? 'border-brand-burgundy bg-brand-burgundy text-white' : 'border-brand-border bg-white'}`}>
-                                {isSelected && (
-                                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
+                            <button
+                              type="button"
+                              onClick={() => toggleSelection(group, opt.id)}
+                              role={isSingle ? "radio" : undefined}
+                              aria-checked={isSingle ? isSelected : undefined}
+                              aria-pressed={!isSingle ? isSelected : undefined}
+                              className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 p-3 text-start transition-all active:scale-[0.99] sm:p-4"
+                            >
+                              <div className="flex min-w-0 items-center gap-3">
+                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${isSelected ? 'border-brand-burgundy bg-brand-burgundy text-white' : 'border-brand-border bg-white'}`}>
+                                  {isSelected && (
+                                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  )}
+                                </span>
+                                <span className={`min-w-0 break-words text-[15px] leading-6 ${isSelected ? 'font-bold text-brand-burgundy' : 'font-medium text-brand-text'}`}>
+                                  {opt.name}
+                                </span>
+                              </div>
+                              {(opt.price || 0) > 0 && (
+                                <span className="shrink-0 text-end">
+                                  <span className={`block text-[14px] font-bold ${isSelected ? 'text-brand-burgundy' : 'text-brand-gold'}`}>
+                                    {isVariant ? '' : '+'}{opt.price} {currency}
+                                  </span>
+                                  {showQuantityControls && (
+                                    <span className="block text-[10px] font-medium leading-4 text-brand-brown">
+                                      {t('singlePiecePrice')}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </button>
+
+                            {showQuantityControls && (
+                              <div className="flex items-end justify-between gap-3 border-t border-brand-burgundy/15 px-3 pb-3 pt-2.5 sm:px-4">
+                                <div className="flex flex-col gap-1.5">
+                                  <span className="text-[11px] font-bold text-brand-brown">{t('addonQuantity')}</span>
+                                  <div className="flex items-center gap-1 rounded-xl border border-brand-border bg-white px-1.5 py-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateOptionQuantity(opt.id, -1)}
+                                      disabled={optionQuantity <= 1}
+                                      className="flex h-7 w-7 items-center justify-center rounded-lg text-lg font-black text-brand-burgundy disabled:opacity-35"
+                                      aria-label={`${t('addonQuantity')} -`}
+                                    >
+                                      -
+                                    </button>
+                                    <span className="min-w-7 text-center text-sm font-black text-brand-text">{optionQuantity}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateOptionQuantity(opt.id, 1)}
+                                      disabled={optionQuantity >= productQuantity}
+                                      className="flex h-7 w-7 items-center justify-center rounded-lg text-lg font-black text-brand-burgundy disabled:opacity-35"
+                                      aria-label={`${t('addonQuantity')} +`}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                                {(opt.price || 0) > 0 && (
+                                  <div className="flex flex-col items-end gap-1.5 text-end">
+                                    <span className="text-[11px] font-bold text-brand-brown">{t('addonPrice')}</span>
+                                    <span className="text-[15px] font-black leading-7 text-brand-burgundy">{optionTotal} {currency}</span>
+                                  </div>
                                 )}
-                              </span>
-                              <span className={`min-w-0 break-words text-[15px] leading-6 ${isSelected ? 'font-bold text-brand-burgundy' : 'font-medium text-brand-text'}`}>
-                                {opt.name}
-                              </span>
-                            </div>
-                            {(opt.price || 0) > 0 && (
-                              <span className={`shrink-0 text-[14px] font-bold ${isSelected ? 'text-brand-burgundy' : 'text-brand-gold'}`}>
-                                {group.kind === 'variant' ? '' : '+'}{opt.price} {currency}
-                              </span>
+                              </div>
                             )}
-                          </button>
+                          </div>
                         )
                       })}
                     </div>
@@ -997,32 +1167,58 @@ export default function MenuClient() {
                     {validationError}
                   </div>
                 )}
-                <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
-                  <div className="flex items-center gap-2 rounded-xl border border-brand-border bg-white px-2 py-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setProductQuantity(qty => Math.max(1, qty - 1))}
-                      disabled={productQuantity <= 1}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg text-xl font-black text-brand-burgundy disabled:opacity-35"
-                    >
-                      -
-                    </button>
-                    <span className="min-w-8 text-center text-sm font-black text-brand-text">{productQuantity}</span>
-                    <button
-                      type="button"
-                      onClick={() => setProductQuantity(qty => qty + 1)}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg text-xl font-black text-brand-burgundy"
-                    >
-                      +
-                    </button>
+                <div className="mb-3 space-y-2 sm:mb-4">
+                  <div className="flex items-center justify-between gap-3">
+                    {pricing !== null ? (
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center justify-between gap-2 text-[13px]">
+                          <span className="font-bold text-brand-brown">{t('baseProductPrice')}</span>
+                          <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 text-end font-black text-brand-text">
+                            <span>{pricing.baseTotal} {currency}</span>
+                            {productQuantity > 1 && (
+                              <span className="text-[10px] font-medium text-brand-brown">({pricing.unitPrice} {currency} × {productQuantity})</span>
+                            )}
+                          </span>
+                        </div>
+                        {pricing.additionsTotal > 0 && (
+                          <div className="flex items-center justify-between gap-2 text-[13px]">
+                            <span className="font-bold text-brand-brown">{t('additionsPrice')}</span>
+                            <span className="font-black text-brand-text">{pricing.additionsTotal} {currency}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="min-w-0 flex-1 text-[14px] font-medium text-brand-brown/70">{t('chooseVariant')}</span>
+                    )}
+                    <div className="flex shrink-0 items-center gap-2 rounded-xl border border-brand-border bg-white px-2 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => changeProductQuantity(-1)}
+                        disabled={productQuantity <= 1}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-xl font-black text-brand-burgundy disabled:opacity-35"
+                      >
+                        -
+                      </button>
+                      <span className="min-w-8 text-center text-sm font-black text-brand-text">{productQuantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => changeProductQuantity(1)}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-xl font-black text-brand-burgundy"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
-                  <span className="min-w-0 text-left text-2xl font-black text-brand-text">
-                    {total !== null ? `${total * productQuantity} ${currency}` : <span className="text-[15px] font-normal text-brand-brown/60">{t('chooseVariant')}</span>}
-                  </span>
+                  {pricing !== null && (
+                    <div className="flex items-center justify-between gap-2 border-t border-brand-border pt-2">
+                      <span className="text-[15px] font-black text-brand-burgundy">{t('total')}</span>
+                      <span className="text-2xl font-black text-brand-burgundy">{pricing.total} {currency}</span>
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={addToCart}
-                  disabled={total === null || validationError !== null}
+                  disabled={pricing === null || validationError !== null}
                   className="w-full rounded-2xl bg-brand-burgundy py-3.5 text-[17px] font-bold text-white transition-all hover:bg-[#681010] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:py-4"
                 >
                   {t('addToCart')}
@@ -1092,13 +1288,21 @@ export default function MenuClient() {
 
                             return (
                               <p key={group.id} className="text-[12px] text-brand-brown">
-                                <span className="font-medium text-brand-text">{group.title}:</span> {selectedOptions.map(o => (o.price || 0) > 0 ? `${o.name} (+${o.price} ${currency})` : o.name).join(locale === 'ar' ? '، ' : ', ')}
+                                <span className="font-medium text-brand-text">{group.title}:</span> {selectedOptions.map(o => {
+                                  const isVariant = group.kind === 'variant'
+                                  const optionQuantity = isVariant ? 1 : Math.max(1, cartItem.optionQuantities[o.id] || 1)
+                                  const quantitySuffix = optionQuantity > 1 ? ` ×${optionQuantity}` : ''
+                                  const optionTotal = (o.price || 0) * optionQuantity
+                                  return optionTotal > 0 && !isVariant
+                                    ? `${o.name}${quantitySuffix} (+${optionTotal} ${currency})`
+                                    : `${o.name}${quantitySuffix}`
+                                }).join(locale === 'ar' ? '، ' : ', ')}
                               </p>
                             )
                           })}
                         </div>
                         <div className="flex items-center justify-between mt-auto pt-2 border-t border-brand-border/30">
-                          <p className="text-brand-burgundy font-black text-[14px]">{cartItem.total * cartItem.quantity} {currency}</p>
+                          <p className="text-brand-burgundy font-black text-[14px]">{cartItem.total} {currency}</p>
                           <div className="flex items-center gap-3 bg-brand-cream border border-brand-border/80 rounded-lg px-2 py-0.5 shadow-sm">
                             <button onClick={() => updateQuantity(cartItem.id, 1)} className="text-brand-burgundy font-bold text-lg leading-none active:scale-90">+</button>
                             <span className="font-bold text-sm min-w-[2ch] text-center">{cartItem.quantity}</span>
