@@ -235,12 +235,11 @@ const buildInitialOptionQuantities = (item: MenuItem, selections: Record<string,
   return initialQuantities
 }
 
-const clampOptionQuantities = (optionQuantities: OptionQuantities, maxQuantity: number) => {
+const normalizeOptionQuantities = (optionQuantities: OptionQuantities) => {
   const nextQuantities: OptionQuantities = {}
-  const safeMaxQuantity = Math.max(1, maxQuantity)
 
   Object.entries(optionQuantities).forEach(([optionId, quantity]) => {
-    nextQuantities[optionId] = Math.min(safeMaxQuantity, Math.max(1, quantity))
+    nextQuantities[optionId] = Math.max(1, quantity)
   })
 
   return nextQuantities
@@ -613,13 +612,12 @@ export default function MenuClient() {
   const changeProductQuantity = (delta: number) => {
     const nextQuantity = Math.max(1, productQuantity + delta)
     setProductQuantity(nextQuantity)
-    setOptionQuantities(current => clampOptionQuantities(current, nextQuantity))
   }
 
   const updateOptionQuantity = (optionId: string, delta: number) => {
     setOptionQuantities(prev => {
       const nextQuantity = Math.max(1, (prev[optionId] || 1) + delta)
-      return { ...prev, [optionId]: Math.min(Math.max(1, productQuantity), nextQuantity) }
+      return { ...prev, [optionId]: nextQuantity }
     })
   }
 
@@ -656,7 +654,7 @@ export default function MenuClient() {
       if (c.id !== cartItemId) return c;
 
       const newQuantity = Math.max(1, c.quantity + delta);
-      const newOptionQuantities = clampOptionQuantities(c.optionQuantities, newQuantity);
+      const newOptionQuantities = normalizeOptionQuantities(c.optionQuantities);
       const newPricing = calculateItemPricing(c.item, c.selections, newOptionQuantities, newQuantity);
       if (!newPricing) return c;
 
@@ -1136,8 +1134,7 @@ export default function MenuClient() {
                                     <button
                                       type="button"
                                       onClick={() => updateOptionQuantity(opt.id, 1)}
-                                      disabled={optionQuantity >= productQuantity}
-                                      className="flex h-7 w-7 items-center justify-center rounded-lg text-lg font-black text-brand-burgundy disabled:opacity-35"
+                                      className="flex h-7 w-7 items-center justify-center rounded-lg text-lg font-black text-brand-burgundy"
                                       aria-label={`${t('addonQuantity')} +`}
                                     >
                                       +
